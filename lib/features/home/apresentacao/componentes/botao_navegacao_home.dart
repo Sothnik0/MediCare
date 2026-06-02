@@ -4,11 +4,13 @@ import '../../../../core/temas/cores_app.dart';
 class BotaoNavegacaoHome extends StatefulWidget {
   final IconData icon;
   final VoidCallback onTap;
+  final String? tooltip;
 
   const BotaoNavegacaoHome({
     super.key,
     required this.icon,
     required this.onTap,
+    this.tooltip,
   });
 
   @override
@@ -18,12 +20,16 @@ class BotaoNavegacaoHome extends StatefulWidget {
 class _BotaoNavegacaoHomeState extends State<BotaoNavegacaoHome> {
   bool _hovering = false;
 
+  // ✅ Métodos separados com tipo explícito — sem erro de assinatura
+  void _onEnter(PointerEvent e) => setState(() => _hovering = true);
+  void _onExit(PointerEvent e)  => setState(() => _hovering = false);
+
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
+    final btn = MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
+      onEnter: _onEnter,
+      onExit: _onExit,
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
@@ -54,5 +60,10 @@ class _BotaoNavegacaoHomeState extends State<BotaoNavegacaoHome> {
         ),
       ),
     );
+
+    if (widget.tooltip != null) {
+      return Tooltip(message: widget.tooltip!, child: btn);
+    }
+    return btn;
   }
 }

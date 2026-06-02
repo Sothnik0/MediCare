@@ -1,152 +1,208 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/temas/cores_app.dart';
-import '../../dados/consulta_medica.dart';
-import '../componentes/cartao_consulta.dart';
+import '../../../../core/servicos/agenda_service.dart';
 import '../componentes/recortes_nuvem.dart';
 
 class TelaAgendaMedica extends StatefulWidget {
-  const TelaAgendaMedica({Key? key}) : super(key: key);
+  const TelaAgendaMedica({super.key});
 
   @override
   State<TelaAgendaMedica> createState() => _TelaAgendaMedicaState();
 }
 
 class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
-  String diaSelecionado = 'SEG';
-  String? filtroSelecionado;
+  final _agendaService = AgendaService();
+  final List<String> _dias = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
+  String _diaSelecionado = 'SEG';
 
-  final List<String> diasDaSemana = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
-
-  final List<ConsultaMedica> listaConsultas = [
-    ConsultaMedica(
-      nomeMedico: 'DR. PEDRO ANDRADE DOS SANTOS',
-      especialidade: 'CARDIOLOGISTA',
-      crmRqe: 'CRM-SE 1234 | RQE 5678',
-      data: 'DATA: SEGUNDA 22/03/2026',
-      horario: 'HORÁRIO: 14:00',
-    ),
-    ConsultaMedica(
-      nomeMedico: 'DRA. AMANDA NICOLE DOS SANTOS',
-      especialidade: 'DERMATOLOGISTA',
-      crmRqe: 'CRM-SE 7865 | RQE 9023',
-      data: 'DATA: QUINTA 22/03/2026',
-      horario: 'HORÁRIO: 18:00',
-    ),
-    ConsultaMedica(
-      nomeMedico: 'DR. ANDRE LUCAS BERENGER',
-      especialidade: 'UROLOGISTA',
-      crmRqe: 'CRM-SE 2245 | RQE 3113',
-      data: 'DATA: QUARTA 12/07/2026',
-      horario: 'HORÁRIO: 16:00',
-    ),
-  ];
-
-  void _abrirDialogNovaConsulta() {
-    final nomeCtrl    = TextEditingController();
-    final espCtrl     = TextEditingController();
-    final crmCtrl     = TextEditingController();
-    final dataCtrl    = TextEditingController();
-    final horarioCtrl = TextEditingController();
+  void _abrirDialogAdicionar() {
+    final medicoCtrl = TextEditingController();
+    final espCtrl    = TextEditingController();
+    final crmCtrl    = TextEditingController();
+    final dataCtrl   = TextEditingController();
+    final horCtrl    = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Nova Consulta',
-            style: TextStyle(fontWeight: FontWeight.w600, color: CoresApp.textoForte)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _campoTexto(nomeCtrl,    'Nome do Médico'),
-              const SizedBox(height: 10),
-              _campoTexto(espCtrl,     'Especialidade'),
-              const SizedBox(height: 10),
-              _campoTexto(crmCtrl,     'CRM | RQE'),
-              const SizedBox(height: 10),
-              _campoTexto(dataCtrl,    'Data (ex: SEGUNDA 22/03/2026)'),
-              const SizedBox(height: 10),
-              _campoTexto(horarioCtrl, 'Horário (ex: 14:00)'),
-            ],
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Adicionar Nova Consulta',
+          style: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.bold, color: CoresApp.textoForte, fontSize: 20),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min, 
+              children: [
+                _campo(medicoCtrl, 'Nome do Médico:'),
+                const SizedBox(height: 14),
+                _campo(espCtrl, 'Especialidade (Ex: Cardiologista):'),
+                const SizedBox(height: 14),
+                _campo(crmCtrl, 'Número do CRM (Opcional):'),
+                const SizedBox(height: 14),
+                _campo(dataCtrl, 'Dia / Data da Consulta:'),
+                const SizedBox(height: 14),
+                _campo(horCtrl, 'Horário (Ex: 14:00):'),
+              ],
+            ),
           ),
         ),
+        actionsPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar',
-                style: TextStyle(color: CoresApp.textoSecundario)),
+            child: const Text('Voltar', style: TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: CoresApp.cianoPrincipal,
-              foregroundColor: CoresApp.textoForte,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onPressed: () {
-              if (nomeCtrl.text.isNotEmpty) {
-                setState(() {
-                  listaConsultas.add(ConsultaMedica(
-                    nomeMedico:    nomeCtrl.text.toUpperCase(),
-                    especialidade: espCtrl.text.toUpperCase(),
-                    crmRqe:        crmCtrl.text.toUpperCase(),
-                    data:    'DATA: ${dataCtrl.text.toUpperCase()}',
-                    horario: 'HORÁRIO: ${horarioCtrl.text}',
-                  ));
-                });
-                Navigator.pop(context);
+            onPressed: () async {
+              if (medicoCtrl.text.isNotEmpty) {
+                // INÍCIO
+                await _agendaService.adicionar(
+                  nomeMedico:    medicoCtrl.text,
+                  especialidade: espCtrl.text,
+                  crmRqe:        crmCtrl.text,
+                  data:          dataCtrl.text,
+                  horario:       horCtrl.text,
+                );
+                // FIM
+                if (mounted) Navigator.pop(context);
               }
             },
-            child: const Text('Adicionar'),
+            child: const Text('GRAVAR', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  Widget _campoTexto(TextEditingController ctrl, String label) {
-    return TextField(
-      controller: ctrl,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle:
-            const TextStyle(fontSize: 12, color: CoresApp.textoSecundario),
-        border:
-            OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide:
-              const BorderSide(color: CoresApp.cianoPrincipal, width: 2),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+  void _confirmarExclusao(String id, String nomeMedico) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Apagar Consulta?', style: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.bold)),
+        content: Text('Tem certeza que deseja apagar a consulta com o Dr(a). $nomeMedico?', style: const TextStyle(fontFamily: 'Serif', fontSize: 16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context), 
+            child: const Text('Não, Cancelar', style: TextStyle(fontSize: 15, color: Colors.grey))
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
+            onPressed: () async {
+              // INÍCIO
+              await _agendaService.excluir(id);
+              // FIM
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Consulta apagada com sucesso!', style: TextStyle(fontSize: 15)))
+                );
+              }
+            },
+            child: const Text('Sim, Apagar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+        ],
       ),
-      style: const TextStyle(fontSize: 13),
+    );
+  }
+
+  Widget _campo(TextEditingController ctrl, String label) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: CoresApp.textoForte, fontFamily: 'Serif'),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: ctrl,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.grey.shade100,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade400)),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: CoresApp.azulCard, width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          ),
+          style: const TextStyle(fontSize: 16, fontFamily: 'Serif', fontWeight: FontWeight.w500),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final emailUsuario = FirebaseAuth.instance.currentUser?.email ?? '';
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton(
-        onPressed: _abrirDialogNovaConsulta,
-        backgroundColor: CoresApp.fundoCreme,
-        foregroundColor: CoresApp.textoForte,
-        elevation: 4,
-        tooltip: 'Nova consulta',
-        child: const Icon(Icons.add),
+      floatingActionButton: SizedBox(
+        width: 70,
+        height: 70,
+        child: FloatingActionButton(
+          onPressed: _abrirDialogAdicionar,
+          backgroundColor: CoresApp.fundoCreme,
+          foregroundColor: CoresApp.textoForte,
+          elevation: 6,
+          child: const Icon(Icons.add, size: 36),
+        ),
       ),
       body: Container(
         decoration: const BoxDecoration(gradient: CoresApp.gradienteBackground),
         child: SafeArea(
-          top: false,
-          bottom: false,
+          top: false, bottom: false,
           child: Column(
             children: [
-              _construirCabecalhoNuvem(),
-              Expanded(child: _construirCorpoPrincipal()),
-              _construirRodapeNuvem(),
+              _buildHeader(context, emailUsuario),
+              Expanded(
+                child: Stack(
+                  children: [
+                    StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: _agendaService.consultasStream(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                          return const Center(
+                            child: Text('Nenhuma consulta marcada.\nToque no botão azul (+) abaixo.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontFamily: 'Serif', color: CoresApp.textoForte, fontSize: 16, fontWeight: FontWeight.w500)),
+                          );
+                        }
+                        final consultas = snapshot.data!;
+                        return ListView(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                          children: [
+                            _buildSeletorDias(),
+                            const SizedBox(height: 16),
+                            ...consultas.map((c) => _buildCartao(c)),
+                          ],
+                        );
+                      },
+                    ),
+                    Positioned(
+                      bottom: 0, left: 0, right: 0,
+                      child: ClipPath(
+                        clipper: RecorteNuvemInferior(),
+                        child: Container(height: 80, color: CoresApp.fundoCreme),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -154,62 +210,175 @@ class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
     );
   }
 
-  Widget _construirCabecalhoNuvem() {
-    final double statusBarH = MediaQuery.of(context).padding.top;
-    const double brancaH = 155.0;
-    const double zonaTituloH = 55.0;
-    final double totalH = statusBarH + brancaH + zonaTituloH;
-
-    return SizedBox(
-      height: totalH,
-      child: Stack(
-        children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: ClipPath(
-              clipper: RecorteNuvemSuperior(),
-              child: Container(
-                height: statusBarH + brancaH,
-                color: CoresApp.fundoCreme,
-                padding: EdgeInsets.only(
-                  top: statusBarH + 12,
-                  left: 16,
-                  right: 16,
-                  bottom: 16,
+  Widget _buildHeader(BuildContext context, String email) {
+    return Column(
+      children: [
+        ClipPath(
+          clipper: RecorteNuvemSuperior(),
+          child: Container(
+            height: 125,
+            color: CoresApp.fundoCreme,
+            padding: const EdgeInsets.fromLTRB(20, 40, 20, 36),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ClipOval(
+                  child: Image.asset('assets/images/Logo.png', width: 48, height: 48, fit: BoxFit.cover),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    _construirLogoPassaro(),
-                    _BotaoIconeHover(
-                      icon: Icons.notification_add_outlined,
-                      onTap: () {},
-                    ),
-                  ],
+                GestureDetector(
+                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Conta conectada: $email', style: const TextStyle(fontFamily: 'Serif', fontSize: 14)),
+                        duration: const Duration(seconds: 3))),
+                  child: const Icon(Icons.notifications_none, size: 32, color: CoresApp.textoForte),
                 ),
-              ),
+              ],
             ),
           ),
-          Positioned(
-            bottom: 8,
-            left: 0,
-            right: 0,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _BotaoVoltarHover(onTap: () => Navigator.pop(context)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: CoresApp.fundoCreme,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Text('AGENDA MÉDICA',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: CoresApp.textoForte, fontFamily: 'Serif')),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSeletorDias() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: _dias.map((dia) {
+        final selecionado = _diaSelecionado == dia;
+        return GestureDetector(
+          onTap: () => setState(() => _diaSelecionado = dia),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+            decoration: BoxDecoration(
+              color: CoresApp.branco,
+              borderRadius: BorderRadius.circular(10),
+              border: selecionado ? Border.all(color: CoresApp.azulCard, width: 2) : null,
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))],
+            ),
+            child: Text(dia,
+              style: TextStyle(
+                fontSize: 13, fontFamily: 'Serif',
+                fontWeight: selecionado ? FontWeight.bold : FontWeight.normal,
+                color: selecionado ? CoresApp.azulCard : CoresApp.textoSecundario,
+              )),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCartao(Map<String, dynamic> c) {
+    final String id              = c['id'] ?? '';
+    final String nomeMedico      = c['nomeMedico'] ?? '';
+    final String especialidade   = c['especialidade'] ?? '';
+    final String crmRqe          = c['crmRqe'] ?? '';
+    final String data            = c['data'] ?? '';
+    final String horario         = c['horario'] ?? '';
+    final bool   notif           = c['notificacaoAtivada'] ?? false;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: CoresApp.branco,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 3))],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 20,
+            height: 125,
+            decoration: const BoxDecoration(
+              color: CoresApp.azulCard,
+              borderRadius: BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
+            ),
+          ),
+          Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Stack(
-                alignment: Alignment.center,
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Seta de voltar corrigida com mapeamento e efeito Hover
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _BotaoVoltarHover(
-                      onTap: () => Navigator.pop(context),
+                  Row(children: [
+                    Expanded(
+                      child: Text(nomeMedico,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: CoresApp.textoForte, fontFamily: 'Serif'),
+                        overflow: TextOverflow.ellipsis),
                     ),
+                    GestureDetector(
+                      // INÍCIO
+                      onTap: () async {
+                        await _agendaService.alternarNotificacao(id, notif);
+                      },
+                      // FIM
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          notif ? Icons.notifications_active : Icons.notifications_none_outlined,
+                          size: 26,
+                          color: notif ? CoresApp.azulCard : CoresApp.textoForte,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => _confirmarExclusao(id, nomeMedico),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.delete_outline, size: 26, color: Colors.red),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+                    children: [
+                      Text(especialidade, style: const TextStyle(fontSize: 13, color: CoresApp.textoSecundario, fontFamily: 'Serif', fontWeight: FontWeight.w500)),
+                      if (crmRqe.isNotEmpty)
+                        Text(crmRqe, style: const TextStyle(fontSize: 12, color: CoresApp.textoSecundario, fontFamily: 'Serif')),
+                    ],
                   ),
-                  _construirTituloCabecalho(),
+                  const Divider(height: 16, thickness: 0.5),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today, size: 16, color: CoresApp.textoSecundario),
+                          const SizedBox(width: 4),
+                          Text(data, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: CoresApp.textoForte, fontFamily: 'Serif')),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time, size: 16, color: CoresApp.textoSecundario),
+                          const SizedBox(width: 4),
+                          Text(horario, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: CoresApp.textoForte, fontFamily: 'Serif')),
+                        ],
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -218,122 +387,8 @@ class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
       ),
     );
   }
-
-  Widget _construirLogoPassaro() {
-    return ClipOval(
-      child: Image.asset(
-        'assets/images/logo.png',
-        width: 45,
-        height: 45,
-        fit: BoxFit.cover,
-      ),
-    );
-  }
-
-  Widget _construirTituloCabecalho() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 8),
-      decoration: BoxDecoration(
-        color: CoresApp.fundoCreme,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: const Text(
-        'AGENDA MÉDICA',
-        style: TextStyle(
-          fontWeight: FontWeight.w400,
-          letterSpacing: 1.2,
-          color: CoresApp.textoForte,
-        ),
-      ),
-    );
-  }
-
-  Widget _construirCorpoPrincipal() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      children: [
-        _construirSeletorDiasDaSemana(),
-        const SizedBox(height: 15),
-        _construirFiltroSuspenso(),
-        const SizedBox(height: 15),
-        _construirListaConsultas(),
-        const SizedBox(height: 80),
-      ],
-    );
-  }
-
-  Widget _construirSeletorDiasDaSemana() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: diasDaSemana.map((dia) {
-        return _BotaoDia(
-          dia: dia,
-          estaSelecionado: diaSelecionado == dia,
-          onTap: () => setState(() => diaSelecionado = dia),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _construirFiltroSuspenso() {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        width: 70,
-        height: 35,
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: CoresApp.branco,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: filtroSelecionado,
-            icon: const Icon(Icons.arrow_drop_down,
-                color: CoresApp.textoSecundario),
-            isExpanded: true,
-            onChanged: (v) => setState(() => filtroSelecionado = v),
-            items: ['Opc 1', 'Opc 2'].map((v) {
-              return DropdownMenuItem(
-                value: v,
-                child: Text(v, style: const TextStyle(fontSize: 12)),
-              );
-            }).toList(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _construirListaConsultas() {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: listaConsultas.length,
-      itemBuilder: (context, index) {
-        final consulta = listaConsultas[index];
-        return CartaoConsulta(
-          consulta: consulta,
-          aoAlternarNotificacao: () =>
-              setState(() => consulta.alternarNotificacao()),
-        );
-      },
-    );
-  }
-
-  Widget _construirRodapeNuvem() {
-    return ClipPath(
-      clipper: RecorteNuvemInferior(),
-      child: Container(
-        height: 80,
-        color: CoresApp.fundoCreme,
-      ),
-    );
-  }
 }
 
-// NOVO WIDGET: Botão de voltar com Hover e cursor de clique para a Web
 class _BotaoVoltarHover extends StatefulWidget {
   final VoidCallback onTap;
   const _BotaoVoltarHover({required this.onTap});
@@ -343,130 +398,27 @@ class _BotaoVoltarHover extends StatefulWidget {
 }
 
 class _BotaoVoltarHoverState extends State<_BotaoVoltarHover> {
-  bool _hovering = false;
+  bool _hovered = false;
+
+  void _onEnter(PointerEvent e) => setState(() => _hovered = true);
+  void _onExit(PointerEvent e)  => setState(() => _hovered = false);
 
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit:  (_) => setState(() => _hovering = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: _hovering ? Colors.black.withOpacity(0.08) : Colors.transparent,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.arrow_back_ios_new, // Ícone atualizado e mais elegante
-            color: _hovering ? CoresApp.cianoPrincipal : CoresApp.textoForte,
-            size: 20,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BotaoDia extends StatefulWidget {
-  final String dia;
-  final bool estaSelecionado;
-  final VoidCallback onTap;
-  const _BotaoDia(
-      {required this.dia,
-      required this.estaSelecionado,
-      required this.onTap});
-  @override
-  State<_BotaoDia> createState() => _BotaoDiaState();
-}
-
-class _BotaoDiaState extends State<_BotaoDia> {
-  bool _hovering = false;
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit:  (_) => setState(() => _hovering = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: _hovering && !widget.estaSelecionado
-                ? CoresApp.branco.withOpacity(0.80)
-                : CoresApp.branco,
-            borderRadius: BorderRadius.circular(10),
-            border: widget.estaSelecionado
-                ? Border.all(color: CoresApp.textoForte, width: 1.5)
-                : _hovering
-                    ? Border.all(color: CoresApp.textoSecundario, width: 1)
-                    : null,
-            boxShadow: [
-              BoxShadow(
-                color:
-                    Colors.black.withOpacity(_hovering ? 0.12 : 0.05),
-                blurRadius: _hovering ? 8 : 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Text(
-            widget.dia,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: widget.estaSelecionado
-                  ? FontWeight.bold
-                  : FontWeight.normal,
-              color: widget.estaSelecionado || _hovering
-                  ? CoresApp.textoForte
-                  : CoresApp.textoSecundario,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BotaoIconeHover extends StatefulWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _BotaoIconeHover({required this.icon, required this.onTap});
-  @override
-  State<_BotaoIconeHover> createState() => _BotaoIconeHoverState();
-}
-
-class _BotaoIconeHoverState extends State<_BotaoIconeHover> {
-  bool _hovering = false;
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit:  (_) => setState(() => _hovering = false),
+      onEnter: _onEnter,
+      onExit: _onExit,
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: _hovering
-                ? Colors.black.withOpacity(0.08)
-                : Colors.transparent,
+            color: _hovered ? CoresApp.azulCard.withOpacity(0.12) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            widget.icon,
-            color: _hovering
-                ? CoresApp.cianoPrincipal
-                : CoresApp.textoForte,
-            size: 28,
-          ),
+          child: Icon(Icons.arrow_back_ios, size: 24, color: _hovered ? CoresApp.azulCard : CoresApp.textoForte),
         ),
       ),
     );
