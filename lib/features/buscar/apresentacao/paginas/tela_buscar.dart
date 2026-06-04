@@ -14,7 +14,6 @@ class TelaBuscar extends StatefulWidget {
 
 class _TelaBuscarState extends State<TelaBuscar> {
   CategoriaRemedio? _filtroSelecionado;
-  String _remedioSelecionado = "";
   bool _abaFavoritos = false;
 
   final _searchCtrl = TextEditingController();
@@ -29,8 +28,6 @@ class _TelaBuscarState extends State<TelaBuscar> {
   final _obsCtrl = TextEditingController();
   CategoriaRemedio _categoriaForm = CategoriaRemedio.nenhuma;
 
-
-  //lista template de remedios
   final List<Remedio> _remedios = [
     Remedio(
       nome: "CARDALI",
@@ -64,7 +61,6 @@ class _TelaBuscarState extends State<TelaBuscar> {
     super.dispose();
   }
 
-  //lista de remedios filtrados utilizando o where
   List<Remedio> get _remediosFiltrados {
     List<Remedio> base = _abaFavoritos
         ? _remedios.where((r) => _favoritos.contains(r.nome)).toList()
@@ -76,36 +72,36 @@ class _TelaBuscarState extends State<TelaBuscar> {
 
     if (_termoBusca.trim().isNotEmpty) {
       base = base
-          .where((r) =>
-              r.nome.toLowerCase().contains(_termoBusca.trim().toLowerCase()))
+          .where(
+            (r) =>
+                r.nome.toLowerCase().contains(_termoBusca.trim().toLowerCase()),
+          )
           .toList();
     }
 
     return base;
   }
 
+  void _toggleFavorito(String nome) => setState(
+    () => _favoritos.contains(nome)
+        ? _favoritos.remove(nome)
+        : _favoritos.add(nome),
+  );
 
-  //toggles
-  void _toggleFavorito(String nome) => setState(() => _favoritos.contains(nome)
-      ? _favoritos.remove(nome)
-      : _favoritos.add(nome));
-
-  void _toggleNotificacao(String nome) =>
-      setState(() => _notificacoes.contains(nome)
-          ? _notificacoes.remove(nome)
-          : _notificacoes.add(nome));
+  void _toggleNotificacao(String nome) => setState(
+    () => _notificacoes.contains(nome)
+        ? _notificacoes.remove(nome)
+        : _notificacoes.add(nome),
+  );
 
   void _excluirRemedio(String nome) {
     setState(() {
       _remedios.removeWhere((r) => r.nome == nome);
       _favoritos.remove(nome);
       _notificacoes.remove(nome);
-      if (_remedioSelecionado == nome) _remedioSelecionado = "";
     });
   }
 
-
-  //container de confirmação de exclusão
   void _confirmarExclusao(String nome) {
     showDialog(
       context: context,
@@ -115,7 +111,10 @@ class _TelaBuscarState extends State<TelaBuscar> {
         title: const Text(
           "EXCLUIR REMÉDIO",
           style: TextStyle(
-              fontFamily: 'Serif', fontSize: 17, color: CoresApp.textoForte),
+            fontFamily: 'Serif',
+            fontSize: 17,
+            color: CoresApp.textoForte,
+          ),
         ),
         content: Text(
           "Deseja excluir o remédio $nome?",
@@ -124,32 +123,36 @@ class _TelaBuscarState extends State<TelaBuscar> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("CANCELAR",
-                style: TextStyle(color: Colors.grey, fontFamily: 'Serif')),
+            child: const Text(
+              "CANCELAR",
+              style: TextStyle(color: Colors.grey, fontFamily: 'Serif'),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () {
               Navigator.pop(ctx);
               _excluirRemedio(nome);
             },
-            child: const Text("EXCLUIR",
-                style: TextStyle(color: Colors.white, fontFamily: 'Serif')),
+            child: const Text(
+              "EXCLUIR",
+              style: TextStyle(color: Colors.white, fontFamily: 'Serif'),
+            ),
           ),
         ],
       ),
     );
   }
 
-
-  //container de popup de notificação
   void _abrirPopUpNotificacoes() {
-    final comNotificacao =
-        _remedios.where((r) => _notificacoes.contains(r.nome)).toList();
+    final comNotificacao = _remedios
+        .where((r) => _notificacoes.contains(r.nome))
+        .toList();
 
     showDialog(
       context: context,
@@ -164,8 +167,11 @@ class _TelaBuscarState extends State<TelaBuscar> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.notifications_active,
-                      color: Color(0xFF008D95), size: 24),
+                  const Icon(
+                    Icons.notifications_active,
+                    color: Color(0xFF008D95),
+                    size: 24,
+                  ),
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
@@ -180,8 +186,11 @@ class _TelaBuscarState extends State<TelaBuscar> {
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close,
-                        size: 22, color: CoresApp.textoForte),
+                    child: const Icon(
+                      Icons.close,
+                      size: 22,
+                      color: CoresApp.textoForte,
+                    ),
                   ),
                 ],
               ),
@@ -216,27 +225,38 @@ class _TelaBuscarState extends State<TelaBuscar> {
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(10),
-                              child: Image.network(r.imagem,
-                                  width: 52, height: 52, fit: BoxFit.cover),
+                              child: Image.network(
+                                r.imagem,
+                                width: 52,
+                                height: 52,
+                                fit: BoxFit.cover,
+                              ),
                             ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(r.nome,
-                                      style: const TextStyle(
-                                          fontFamily: 'Serif',
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                          color: CoresApp.textoForte)),
+                                  Text(
+                                    r.nome,
+                                    style: const TextStyle(
+                                      fontFamily: 'Serif',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: CoresApp.textoForte,
+                                    ),
+                                  ),
                                   const SizedBox(height: 2),
-                                  Text("HORÁRIO: ${r.horario}",
-                                      style: TextStyle(
-                                          fontFamily: 'Serif',
-                                          fontSize: 13,
-                                          color: CoresApp.textoForte
-                                              .withOpacity(0.6))),
+                                  Text(
+                                    "HORÁRIO: ${r.horario}",
+                                    style: TextStyle(
+                                      fontFamily: 'Serif',
+                                      fontSize: 13,
+                                      color: CoresApp.textoForte.withOpacity(
+                                        0.6,
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -252,8 +272,11 @@ class _TelaBuscarState extends State<TelaBuscar> {
                                       setLocalState(() {});
                                     }
                                   },
-                                  child: const Icon(Icons.notifications_active,
-                                      color: Color(0xFF008D95), size: 26),
+                                  child: const Icon(
+                                    Icons.notifications_active,
+                                    color: Color(0xFF008D95),
+                                    size: 26,
+                                  ),
                                 ),
                               ),
                             ),
@@ -270,8 +293,6 @@ class _TelaBuscarState extends State<TelaBuscar> {
     );
   }
 
-
-  //funcionalidade de abrir dialogo
   void _abrirDialogAdicionar() {
     _nomeCtrl.clear();
     _horarioCtrl.clear();
@@ -283,12 +304,16 @@ class _TelaBuscarState extends State<TelaBuscar> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: CoresApp.nuvemBranco,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Text(
             "ADICIONAR REMÉDIO",
             style: TextStyle(
-                fontFamily: 'Serif', fontSize: 18, color: CoresApp.textoForte),
+              fontFamily: 'Serif',
+              fontSize: 18,
+              color: CoresApp.textoForte,
+            ),
           ),
           content: Form(
             key: _formKey,
@@ -331,48 +356,57 @@ class _TelaBuscarState extends State<TelaBuscar> {
                 const Text(
                   "CATEGORIA",
                   style: TextStyle(
-                      fontFamily: 'Serif',
-                      fontSize: 13,
-                      color: CoresApp.textoForte),
+                    fontFamily: 'Serif',
+                    fontSize: 13,
+                    color: CoresApp.textoForte,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
-                  children: [
-                    CategoriaRemedio.dor,
-                    CategoriaRemedio.vitaminina,
-                    CategoriaRemedio.cardiaco,
-                  ].map((cat) {
-                    final ativo = _categoriaForm == cat;
-                    return GestureDetector(
-                      onTap: () => setDialogState(() => _categoriaForm =
-                          ativo ? CategoriaRemedio.nenhuma : cat),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: ativo
-                              ? const Color(0xFF008D95)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: ativo
-                                ? const Color(0xFF008D95)
-                                : CoresApp.textoForte.withOpacity(0.3),
+                  children:
+                      [
+                        CategoriaRemedio.dor,
+                        CategoriaRemedio.vitaminina,
+                        CategoriaRemedio.cardiaco,
+                      ].map((cat) {
+                        final ativo = _categoriaForm == cat;
+                        return GestureDetector(
+                          onTap: () => setDialogState(
+                            () => _categoriaForm = ativo
+                                ? CategoriaRemedio.nenhuma
+                                : cat,
                           ),
-                        ),
-                        child: Text(
-                          cat.label,
-                          style: TextStyle(
-                            fontFamily: 'Serif',
-                            fontSize: 13,
-                            color: ativo ? Colors.white : CoresApp.textoForte,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: ativo
+                                  ? const Color(0xFF008D95)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: ativo
+                                    ? const Color(0xFF008D95)
+                                    : CoresApp.textoForte.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Text(
+                              cat.label,
+                              style: TextStyle(
+                                fontFamily: 'Serif',
+                                fontSize: 13,
+                                color: ativo
+                                    ? Colors.white
+                                    : CoresApp.textoForte,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                        );
+                      }).toList(),
                 ),
               ],
             ),
@@ -380,18 +414,23 @@ class _TelaBuscarState extends State<TelaBuscar> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("CANCELAR",
-                  style: TextStyle(color: Colors.grey, fontFamily: 'Serif')),
+              child: const Text(
+                "CANCELAR",
+                style: TextStyle(color: Colors.grey, fontFamily: 'Serif'),
+              ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF008D95),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               onPressed: _salvarRemedio,
-              child: const Text("SALVAR",
-                  style: TextStyle(color: Colors.white, fontFamily: 'Serif')),
+              child: const Text(
+                "SALVAR",
+                style: TextStyle(color: Colors.white, fontFamily: 'Serif'),
+              ),
             ),
           ],
         ),
@@ -399,19 +438,19 @@ class _TelaBuscarState extends State<TelaBuscar> {
     );
   }
 
-
-  //função para adicionar remedio na lista
   void _salvarRemedio() {
     if (_formKey.currentState!.validate()) {
       setState(() {
-        _remedios.add(Remedio(
-          nome: _nomeCtrl.text.trim().toUpperCase(),
-          horario: _horarioCtrl.text.trim(),
-          obs: _obsCtrl.text.trim().isEmpty
-              ? 'NENHUMA'
-              : _obsCtrl.text.trim().toUpperCase(),
-          categoria: _categoriaForm,
-        ));
+        _remedios.add(
+          Remedio(
+            nome: _nomeCtrl.text.trim().toUpperCase(),
+            horario: _horarioCtrl.text.trim(),
+            obs: _obsCtrl.text.trim().isEmpty
+                ? 'NENHUMA'
+                : _obsCtrl.text.trim().toUpperCase(),
+            categoria: _categoriaForm,
+          ),
+        );
       });
       Navigator.pop(context);
     }
@@ -420,7 +459,6 @@ class _TelaBuscarState extends State<TelaBuscar> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: _buildDrawer(),
       backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF008D95),
@@ -481,8 +519,12 @@ class _TelaBuscarState extends State<TelaBuscar> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             ClipOval(
-              child: Image.asset('assets/images/Logo.png',
-                  width: 55, height: 55, fit: BoxFit.cover),
+              child: Image.asset(
+                'assets/images/Logo.png',
+                width: 55,
+                height: 55,
+                fit: BoxFit.cover,
+              ),
             ),
             MouseRegion(
               cursor: SystemMouseCursors.click,
@@ -505,13 +547,18 @@ class _TelaBuscarState extends State<TelaBuscar> {
                           width: 18,
                           height: 18,
                           decoration: const BoxDecoration(
-                              color: Color(0xFF008D95), shape: BoxShape.circle),
+                            color: Color(0xFF008D95),
+                            shape: BoxShape.circle,
+                          ),
                           child: Center(
-                            child: Text('${_notificacoes.length}',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold)),
+                            child: Text(
+                              '${_notificacoes.length}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
                       )
@@ -523,10 +570,14 @@ class _TelaBuscarState extends State<TelaBuscar> {
                           width: 14,
                           height: 14,
                           decoration: const BoxDecoration(
-                              color: CoresApp.textoForte,
-                              shape: BoxShape.circle),
-                          child: const Icon(Icons.add,
-                              color: Colors.white, size: 10),
+                            color: CoresApp.textoForte,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            color: Colors.white,
+                            size: 10,
+                          ),
                         ),
                       ),
                   ],
@@ -573,69 +624,33 @@ class _TelaBuscarState extends State<TelaBuscar> {
     );
   }
 
-  Widget _buildDrawer() {
-    return Drawer(
-      backgroundColor: CoresApp.nuvemBranco,
-      child: ListView(
-        children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(color: CoresApp.cianoPrincipal),
-            child: Text("MENU",
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Serif')),
-          ),
-          _buildDrawerItem(Icons.medication, "Medicamentos"),
-          _buildDrawerItem(Icons.favorite, "Favoritos"),
-          _buildDrawerItem(Icons.notifications, "Lembretes"),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDrawerItem(IconData icon, String title) {
-    return ListTile(
-      leading: Icon(icon, color: CoresApp.textoForte),
-      title: Text(title,
-          style: const TextStyle(fontFamily: 'Serif', fontSize: 16)),
-      onTap: () {},
-    );
-  }
-
   Widget _buildAbaWidget({
     required String texto,
     required bool ativo,
     required VoidCallback onTap,
   }) {
-    return Expanded(
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            height: 55,
-            decoration: BoxDecoration(
-              color: ativo ? const Color(0xFF008D95) : CoresApp.cianoClaro,
-              boxShadow: const [
-                BoxShadow(
-                    color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
-              ],
-            ),
-            child: Center(
-              child: Text(
-                texto,
-                style: TextStyle(
-                  color: ativo
-                      ? Colors.white
-                      : CoresApp.textoForte.withOpacity(0.6),
-                  fontSize: 18,
-                  fontWeight: FontWeight.w300,
-                  fontFamily: 'Serif',
-                  letterSpacing: 1,
-                ),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: ativo ? const Color(0xFF008D95) : Colors.transparent,
+                width: 2.5,
               ),
+            ),
+          ),
+          child: Text(
+            texto,
+            style: TextStyle(
+              fontFamily: 'Serif',
+              fontSize: 15,
+              fontWeight: ativo ? FontWeight.w600 : FontWeight.w400,
+              color: ativo ? const Color(0xFF008D95) : CoresApp.textoSecundario,
             ),
           ),
         ),
@@ -653,24 +668,14 @@ class _TelaBuscarState extends State<TelaBuscar> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: const [
             BoxShadow(
-                color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))
+              color: Colors.black12,
+              blurRadius: 8,
+              offset: Offset(0, 4),
+            ),
           ],
         ),
         child: Row(
           children: [
-            const SizedBox(width: 8),
-            Builder(
-              builder: (context) => GestureDetector(
-                onTap: () => Scaffold.of(context).openDrawer(),
-                child: Container(
-                  width: 45,
-                  height: 45,
-                  color: Colors.transparent,
-                  child: const Icon(Icons.menu,
-                      size: 28, color: CoresApp.textoForte),
-                ),
-              ),
-            ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -682,7 +687,10 @@ class _TelaBuscarState extends State<TelaBuscar> {
                     hintText: "Buscar medicamento...",
                     border: InputBorder.none,
                     hintStyle: TextStyle(
-                        fontFamily: 'Serif', color: Colors.grey, fontSize: 16),
+                      fontFamily: 'Serif',
+                      color: Colors.grey,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
@@ -691,8 +699,11 @@ class _TelaBuscarState extends State<TelaBuscar> {
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
                 onTap: () => setState(() => _termoBusca = _searchCtrl.text),
-                child: const Icon(Icons.search,
-                    size: 32, color: CoresApp.textoForte),
+                child: const Icon(
+                  Icons.search,
+                  size: 32,
+                  color: CoresApp.textoForte,
+                ),
               ),
             ),
             const SizedBox(width: 16),
@@ -771,20 +782,17 @@ class _TelaBuscarState extends State<TelaBuscar> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18),
-      child: Column(
-        children: lista.map((r) => _buildRemedioCard(r)).toList(),
-      ),
+      child: Column(children: lista.map((r) => _buildRemedioCard(r)).toList()),
     );
   }
 
   Widget _buildRemedioCard(Remedio r) {
-    final bool selecionado = _remedioSelecionado == r.nome;
     final bool favoritado = _favoritos.contains(r.nome);
     final bool notificacaoAtiva = _notificacoes.contains(r.nome);
 
     return RemedioCardHover(
       key: ValueKey(r.nome),
-      onTap: () => setState(() => _remedioSelecionado = selecionado ? "" : r.nome),
+      onTap: () {},
       cardBuilder: (hovered) => AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 18),
@@ -792,15 +800,18 @@ class _TelaBuscarState extends State<TelaBuscar> {
         decoration: BoxDecoration(
           color: hovered ? const Color(0xFFE0F5F5) : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: selecionado
-              ? Border.all(color: const Color(0xFF008D95), width: 2)
-              : hovered
-                  ? Border.all(
-                      color: const Color(0xFF008D95).withOpacity(0.4), width: 1)
-                  : null,
+          border: hovered
+              ? Border.all(
+                  color: const Color(0xFF008D95).withOpacity(0.4),
+                  width: 1,
+                )
+              : null,
           boxShadow: const [
             BoxShadow(
-                color: Colors.black12, blurRadius: 6, offset: Offset(0, 3))
+              color: Colors.black12,
+              blurRadius: 6,
+              offset: Offset(0, 3),
+            ),
           ],
         ),
         child: Row(
@@ -810,8 +821,12 @@ class _TelaBuscarState extends State<TelaBuscar> {
                 topLeft: Radius.circular(16),
                 bottomLeft: Radius.circular(16),
               ),
-              child: Image.network(r.imagem,
-                  width: 120, height: double.infinity, fit: BoxFit.cover),
+              child: Image.network(
+                r.imagem,
+                width: 120,
+                height: double.infinity,
+                fit: BoxFit.cover,
+              ),
             ),
             Expanded(
               child: Padding(
@@ -846,8 +861,9 @@ class _TelaBuscarState extends State<TelaBuscar> {
                                     : Icons.favorite_border,
                                 key: ValueKey('fav_$favoritado'),
                                 size: 26,
-                                color:
-                                    favoritado ? Colors.red : CoresApp.textoForte,
+                                color: favoritado
+                                    ? Colors.red
+                                    : CoresApp.textoForte,
                               ),
                             ),
                           ),
@@ -903,7 +919,9 @@ class _TelaBuscarState extends State<TelaBuscar> {
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFF008D95).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(10),
