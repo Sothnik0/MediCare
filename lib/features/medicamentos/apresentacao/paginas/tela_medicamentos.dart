@@ -19,6 +19,16 @@ class _GerenciarMedicamentosPageState extends State<GerenciarMedicamentosPage> {
   final CollectionReference<Map<String, dynamic>> medicamentosRef =
       FirebaseFirestore.instance.collection('medicamentos');
 
+  final TextEditingController _buscaController = TextEditingController();
+
+  String termoBusca = '';
+
+  @override
+  void dispose() {
+    _buscaController.dispose();
+    super.dispose();
+  }
+
   Map<String, dynamic> _medicamentoToMap(
     Medicamento medicamento, {
     bool criando = false,
@@ -181,6 +191,30 @@ class _GerenciarMedicamentosPageState extends State<GerenciarMedicamentosPage> {
     );
   }
 
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _filtrarDocumentos(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> documentos,
+  ) {
+    if (termoBusca.isEmpty) {
+      return documentos;
+    }
+
+    return documentos.where((doc) {
+      final item = _medicamentoFromDoc(doc);
+
+      final nomeMedicamento = item.medicamento.toLowerCase();
+      final nomeMedico = item.medico.toLowerCase();
+      final especialidade = item.especialidade.toLowerCase();
+      final receita = item.receita.toLowerCase();
+      final crm = item.crm.toLowerCase();
+
+      return nomeMedicamento.contains(termoBusca) ||
+          nomeMedico.contains(termoBusca) ||
+          especialidade.contains(termoBusca) ||
+          receita.contains(termoBusca) ||
+          crm.contains(termoBusca);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -202,17 +236,17 @@ class _GerenciarMedicamentosPageState extends State<GerenciarMedicamentosPage> {
                 ),
               ),
             ),
-
             SafeArea(
               child: Column(
                 children: [
                   _buildHeader(context),
                   _buildSearchBar(),
                   _buildAddButton(),
-
                   Expanded(
                     child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: medicamentosRef.snapshots(),
+                      stream: medicamentosRef
+                          .orderBy('criadoEm', descending: true)
+                          .snapshots(),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -227,20 +261,25 @@ class _GerenciarMedicamentosPageState extends State<GerenciarMedicamentosPage> {
                               'Erro ao carregar medicamentos',
                               style: TextStyle(
                                 color: CoresApp.textoForte,
+                                fontSize: 18,
                               ),
                             ),
                           );
                         }
 
-                        final documentos = snapshot.data?.docs ?? [];
+                        final todosDocumentos = snapshot.data?.docs ?? [];
+                        final documentos = _filtrarDocumentos(todosDocumentos);
 
                         if (documentos.isEmpty) {
-                          return const Center(
+                          return Center(
                             child: Text(
-                              'Nenhum medicamento cadastrado',
-                              style: TextStyle(
+                              termoBusca.isEmpty
+                                  ? 'Nenhum medicamento cadastrado'
+                                  : 'Nenhum resultado encontrado',
+                              style: const TextStyle(
                                 color: CoresApp.textoForte,
-                                fontSize: 16,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           );
@@ -258,7 +297,7 @@ class _GerenciarMedicamentosPageState extends State<GerenciarMedicamentosPage> {
                             final item = _medicamentoFromDoc(doc);
 
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
+                              padding: const EdgeInsets.only(bottom: 16),
                               child: MedicamentoCard(
                                 corLateral: item.corLateral,
                                 medico: item.medico,
@@ -311,14 +350,13 @@ class _GerenciarMedicamentosPageState extends State<GerenciarMedicamentosPage> {
                 ),
                 const Icon(
                   Icons.notifications_none,
-                  size: 28,
+                  size: 30,
                   color: CoresApp.textoForte,
                 ),
               ],
             ),
           ),
         ),
-
         Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: 16,
@@ -333,11 +371,10 @@ class _GerenciarMedicamentosPageState extends State<GerenciarMedicamentosPage> {
                   onTap: () => Navigator.pop(context),
                 ),
               ),
-
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
+                  horizontal: 18,
+                  vertical: 10,
                 ),
                 decoration: BoxDecoration(
                   color: CoresApp.fundoCreme,
@@ -349,10 +386,10 @@ class _GerenciarMedicamentosPageState extends State<GerenciarMedicamentosPage> {
                 child: const Text(
                   'GERENCIAR MEDICAMENTOS',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 15,
                     letterSpacing: 1.2,
                     color: CoresApp.textoForte,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -367,39 +404,63 @@ class _GerenciarMedicamentosPageState extends State<GerenciarMedicamentosPage> {
     return Container(
       margin: const EdgeInsets.symmetric(
         horizontal: 20,
-        vertical: 8,
+        vertical: 10,
       ),
-      height: 46,
+      height: 58,
       decoration: BoxDecoration(
         color: CoresApp.branco,
-        borderRadius: BorderRadius.circular(23),
+        borderRadius: BorderRadius.circular(29),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 5,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: const Row(
-        children: [
-          SizedBox(width: 16),
-          Icon(
-            Icons.search,
-            size: 22,
+      child: TextField(
+        controller: _buscaController,
+        onChanged: (valor) {
+          setState(() {
+            termoBusca = valor.toLowerCase().trim();
+          });
+        },
+        style: const TextStyle(
+          fontSize: 18,
+          color: CoresApp.textoForte,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Buscar medicamento...',
+          hintStyle: const TextStyle(
+            fontSize: 17,
             color: CoresApp.textoSecundario,
           ),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Buscar medicamento...',
-              style: TextStyle(
-                color: CoresApp.textoSecundario,
-                fontSize: 14,
-              ),
-            ),
+          prefixIcon: const Icon(
+            Icons.search,
+            size: 28,
+            color: CoresApp.textoSecundario,
           ),
-        ],
+          suffixIcon: termoBusca.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.close,
+                    size: 26,
+                    color: CoresApp.textoSecundario,
+                  ),
+                  onPressed: () {
+                    _buscaController.clear();
+
+                    setState(() {
+                      termoBusca = '';
+                    });
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 16,
+          ),
+        ),
       ),
     );
   }
@@ -408,7 +469,7 @@ class _GerenciarMedicamentosPageState extends State<GerenciarMedicamentosPage> {
     return Padding(
       padding: const EdgeInsets.only(
         right: 20,
-        bottom: 10,
+        bottom: 12,
         top: 4,
       ),
       child: Align(
@@ -445,7 +506,7 @@ class _BotaoVoltarHoverState extends State<_BotaoVoltarHover> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: _hovering
                 ? CoresApp.azulCard.withOpacity(0.12)
@@ -454,7 +515,7 @@ class _BotaoVoltarHoverState extends State<_BotaoVoltarHover> {
           ),
           child: Icon(
             Icons.arrow_back_ios,
-            size: 22,
+            size: 26,
             color: _hovering ? CoresApp.azulCard : CoresApp.textoForte,
           ),
         ),
@@ -487,14 +548,14 @@ class _BotaoAdicionarHoverState extends State<_BotaoAdicionarHover> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          width: 40,
-          height: 40,
+          width: 50,
+          height: 50,
           decoration: BoxDecoration(
             color: _hovering ? CoresApp.azulCard : CoresApp.branco,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(_hovering ? 0.12 : 0.05),
+                color: Colors.black.withOpacity(_hovering ? 0.14 : 0.06),
                 blurRadius: _hovering ? 8 : 4,
                 offset: const Offset(0, 2),
               ),
@@ -502,7 +563,7 @@ class _BotaoAdicionarHoverState extends State<_BotaoAdicionarHover> {
           ),
           child: Icon(
             Icons.add,
-            size: 26,
+            size: 32,
             color: _hovering ? CoresApp.branco : CoresApp.textoForte,
           ),
         ),
