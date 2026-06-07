@@ -26,7 +26,7 @@ class MedicamentoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 175,
+      height: 220,
       decoration: BoxDecoration(
         color: CoresApp.branco,
         borderRadius: BorderRadius.circular(12),
@@ -64,9 +64,10 @@ class MedicamentoCard extends StatelessWidget {
                         child: Text(
                           'MÉDICO(A): $medico',
                           style: const TextStyle(
-                            fontSize: 10,
-                            letterSpacing: 0.7,
+                            fontSize: 16,
+                            letterSpacing: 0.4,
                             color: CoresApp.textoForte,
+                            fontWeight: FontWeight.w600,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -80,7 +81,7 @@ class MedicamentoCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(especialidade,
-                          style: const TextStyle(fontSize: 10, letterSpacing: 0.8, color: CoresApp.textoSecundario)),
+                          style: const TextStyle(fontSize: 15, letterSpacing: 0.8, color: CoresApp.textoSecundario)),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Text(crm,
@@ -112,7 +113,7 @@ class MedicamentoCard extends StatelessWidget {
                         child: Text(
                           'MEDICAMENTO: $medicamento',
                           style: const TextStyle(
-                            fontSize: 10,
+                            fontSize: 16,
                             letterSpacing: 0.8,
                             color: CoresApp.textoForte,
                             fontWeight: FontWeight.w500,
