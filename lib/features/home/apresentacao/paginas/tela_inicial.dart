@@ -1,3 +1,4 @@
+import 'package:medicare/features/auth/apresentacao/paginas/tela_login.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,13 +19,11 @@ class TelaInicial extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final nomeUsuario =
-        user?.email?.split('@').first.toUpperCase() ?? 'USUÁRIO';
+    final nomeUsuario = user?.email?.split('@').first.toUpperCase() ?? 'USUÁRIO';
 
     return Scaffold(
       body: Container(
-        decoration:
-            const BoxDecoration(gradient: CoresApp.gradienteBackground),
+        decoration: const BoxDecoration(gradient: CoresApp.gradienteBackground),
         child: SafeArea(
           top: false,
           bottom: false,
@@ -68,8 +67,7 @@ class TelaInicial extends StatelessWidget {
                     imgPath: 'assets/images/card_agendamento.png',
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (_) => const TelaAgendaMedica()),
+                      MaterialPageRoute(builder: (_) => const TelaAgendaMedica()),
                     ),
                   ),
                   CartaoHorizontal(
@@ -77,8 +75,7 @@ class TelaInicial extends StatelessWidget {
                     imgPath: 'assets/images/card_remedios.png',
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (_) => const GerenciarMedicamentosPage()),
+                      MaterialPageRoute(builder: (_) => const GerenciarMedicamentosPage()),
                     ),
                   ),
                   CartaoHorizontal(
@@ -189,8 +186,7 @@ class TelaInicial extends StatelessWidget {
             tooltip: 'Gerenciar Medicamentos',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const GerenciarMedicamentosPage()),
+              MaterialPageRoute(builder: (_) => const GerenciarMedicamentosPage()),
             ),
           ),
         ],
@@ -285,33 +281,45 @@ class _BotaoSairState extends State<_BotaoSair> {
       onEnter: _onEnter,
       onExit: _onExit,
       child: GestureDetector(
-        //INICIO
+        // INÍCIO
         onTap: () async {
           final confirma = await showDialog<bool>(
             context: context,
             builder: (_) => AlertDialog(
-              title: const Text('Sair do app', style: TextStyle(fontFamily: 'Serif')),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Text('Sair do app', style: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.bold)),
               content: const Text('Deseja encerrar sua sessão?', style: TextStyle(fontFamily: 'Serif')),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+                  child: const Text('Não, Cancelar', style: TextStyle(color: Colors.grey, fontFamily: 'Serif', fontWeight: FontWeight.w600)),
                 ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: CoresApp.azulCard),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  ),
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('SAIR', style: TextStyle(color: Colors.white)),
+                  child: const Text('Sim, Sair', style: TextStyle(color: Colors.white, fontFamily: 'Serif')),
                 ),
               ],
             ),
           );
-          //INICIO
+
           if (confirma == true) {
             await AuthService().logout();
+            if (context.mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const TelaLogin()),
+                (Route<dynamic> route) => false,
+              );
+            }
           }
-
-        }, //FIM
-
+        },
+        // FIM
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.all(8),

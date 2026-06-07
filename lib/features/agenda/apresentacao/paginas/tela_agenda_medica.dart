@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/temas/cores_app.dart';
 import '../../../../core/servicos/agenda_service.dart';
@@ -38,15 +39,27 @@ class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
             child: Column(
               mainAxisSize: MainAxisSize.min, 
               children: [
-                _campo(medicoCtrl, 'Nome do Médico:'),
+                _campo(ctrl: medicoCtrl, label: 'Nome do Médico:'),
                 const SizedBox(height: 14),
-                _campo(espCtrl, 'Especialidade (Ex: Cardiologista):'),
+                _campo(ctrl: espCtrl, label: 'Especialidade (Ex: Cardiologista):'),
                 const SizedBox(height: 14),
-                _campo(crmCtrl, 'Número do CRM (Opcional):'),
+                _campo(ctrl: crmCtrl, label: 'Número do CRM (Opcional):'),
                 const SizedBox(height: 14),
-                _campo(dataCtrl, 'Dia / Data da Consulta:'),
+                _campo(
+                  ctrl: dataCtrl, 
+                  label: 'Dia / Data da Consulta:',
+                  keyboardType: TextInputType.number,
+                  formatters: [MascaraDataHora(isData: true)],
+                  hintText: 'DD/MM/AAAA',
+                ),
                 const SizedBox(height: 14),
-                _campo(horCtrl, 'Horário (Ex: 14:00):'),
+                _campo(
+                  ctrl: horCtrl, 
+                  label: 'Horário:',
+                  keyboardType: TextInputType.number,
+                  formatters: [MascaraDataHora(isData: false)],
+                  hintText: '00:00',
+                ),
               ],
             ),
           ),
@@ -54,12 +67,17 @@ class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
         actionsPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
         actions: [
           TextButton(
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.grey.shade200,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             onPressed: () => Navigator.pop(context),
-            child: const Text('Voltar', style: TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.bold)),
+            child: Text('Voltar', style: TextStyle(color: Colors.grey.shade800, fontSize: 15, fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: CoresApp.cianoPrincipal,
+              backgroundColor: CoresApp.azulCard,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -77,7 +95,7 @@ class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
                 if (mounted) Navigator.pop(context);
               }
             },
-            child: const Text('GRAVAR', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
+            child: const Text('GRAVAR', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -87,13 +105,17 @@ class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
   void _confirmarExclusao(String id, String nomeMedico) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (BuildContext dialogContext) => AlertDialog(
         title: const Text('Apagar Consulta?', style: TextStyle(fontFamily: 'Serif', fontWeight: FontWeight.bold)),
         content: Text('Tem certeza que deseja apagar a consulta com o Dr(a). $nomeMedico?', style: const TextStyle(fontFamily: 'Serif', fontSize: 16)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context), 
-            child: const Text('Não, Cancelar', style: TextStyle(fontSize: 15, color: Colors.grey))
+            style: TextButton.styleFrom(
+              backgroundColor: CoresApp.azulCard,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+            onPressed: () => Navigator.pop(dialogContext), 
+            child: const Text('Não, Cancelar', style: TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.bold))
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
@@ -101,10 +123,17 @@ class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
               // INÍCIO
               await _agendaService.excluir(id);
               // FIM
+              
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+              
               if (mounted) {
-                Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Consulta apagada com sucesso!', style: TextStyle(fontSize: 15)))
+                  const SnackBar(
+                    content: Text('Consulta apagada com sucesso!', style: TextStyle(fontSize: 15)),
+                    backgroundColor: Colors.green,
+                  )
                 );
               }
             },
@@ -115,7 +144,13 @@ class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
     );
   }
 
-  Widget _campo(TextEditingController ctrl, String label) {
+  Widget _campo({
+    required TextEditingController ctrl,
+    required String label,
+    TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? formatters,
+    String? hintText,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -126,7 +161,11 @@ class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
         const SizedBox(height: 6),
         TextField(
           controller: ctrl,
+          keyboardType: keyboardType,
+          inputFormatters: formatters,
           decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: TextStyle(color: Colors.grey.shade400),
             filled: true,
             fillColor: Colors.grey.shade100,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade400)),
@@ -290,13 +329,13 @@ class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
   }
 
   Widget _buildCartao(Map<String, dynamic> c) {
-    final String id              = c['id'] ?? '';
-    final String nomeMedico      = c['nomeMedico'] ?? '';
-    final String especialidade   = c['especialidade'] ?? '';
-    final String crmRqe          = c['crmRqe'] ?? '';
-    final String data            = c['data'] ?? '';
-    final String horario         = c['horario'] ?? '';
-    final bool   notif           = c['notificacaoAtivada'] ?? false;
+    final String id          = c['id'] ?? '';
+    final String nomeMedico  = c['nomeMedico'] ?? '';
+    final String especialidade = c['especialidade'] ?? '';
+    final String crmRqe      = c['crmRqe'] ?? '';
+    final String data        = c['data'] ?? '';
+    final String horario     = c['horario'] ?? '';
+    final bool   notif       = c['notificacaoAtivada'] ?? false;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -327,27 +366,24 @@ class _TelaAgendaMedicaState extends State<TelaAgendaMedica> {
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: CoresApp.textoForte, fontFamily: 'Serif'),
                         overflow: TextOverflow.ellipsis),
                     ),
-                    GestureDetector(
-                      // INÍCIO
+                    _IconeCartaoHover(
+                      corFundoHover: CoresApp.azulCard.withOpacity(0.15),
                       onTap: () async {
+                        // INÍCIO
                         await _agendaService.alternarNotificacao(id, notif);
+                        // FIM
                       },
-                      // FIM
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Icon(
-                          notif ? Icons.notifications_active : Icons.notifications_none_outlined,
-                          size: 26,
-                          color: notif ? CoresApp.azulCard : CoresApp.textoForte,
-                        ),
+                      child: Icon(
+                        notif ? Icons.notifications_active : Icons.notifications_none_outlined,
+                        size: 26,
+                        color: notif ? CoresApp.azulCard : CoresApp.textoForte,
                       ),
                     ),
-                    GestureDetector(
+                    const SizedBox(width: 4),
+                    _IconeCartaoHover(
+                      corFundoHover: Colors.red.withOpacity(0.15),
                       onTap: () => _confirmarExclusao(id, nomeMedico),
-                      child: const Padding(
-                        padding: EdgeInsets.all(6),
-                        child: Icon(Icons.delete_outline, size: 26, color: Colors.red),
-                      ),
+                      child: const Icon(Icons.delete_outline, size: 26, color: Colors.red),
                     ),
                   ]),
                   const SizedBox(height: 4),
@@ -421,6 +457,74 @@ class _BotaoVoltarHoverState extends State<_BotaoVoltarHover> {
           child: Icon(Icons.arrow_back_ios, size: 24, color: _hovered ? CoresApp.azulCard : CoresApp.textoForte),
         ),
       ),
+    );
+  }
+}
+
+class _IconeCartaoHover extends StatefulWidget {
+  final Widget child;
+  final Color corFundoHover;
+  final VoidCallback onTap;
+
+  const _IconeCartaoHover({
+    required this.child,
+    required this.corFundoHover,
+    required this.onTap,
+  });
+
+  @override
+  State<_IconeCartaoHover> createState() => _IconeCartaoHoverState();
+}
+
+class _IconeCartaoHoverState extends State<_IconeCartaoHover> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: _hovered ? widget.corFundoHover : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+class MascaraDataHora extends TextInputFormatter {
+  final bool isData;
+  MascaraDataHora({required this.isData});
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final text = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    String masked = '';
+    int i = 0;
+    final mask = isData ? '##/##/####' : '##:##';
+    
+    for (int m = 0; m < mask.length; m++) {
+      if (i >= text.length) break;
+      if (mask[m] == '#') {
+        masked += text[i];
+        i++;
+      } else {
+        masked += mask[m];
+      }
+    }
+    
+    return TextEditingValue(
+      text: masked,
+      selection: TextSelection.collapsed(offset: masked.length),
     );
   }
 }

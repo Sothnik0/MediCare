@@ -5,12 +5,16 @@ class AuthService {
 
   void _validarDominioInstitucional(User? user) {
     if (user == null) return;
-    
-    final email = user.email ?? "";
-    
-    if (!email.endsWith('@souunit.com.br')) {
+
+    final email = user.email ?? '';
+
+    if (!email.toLowerCase().endsWith('@souunit.com.br')) {
       logout();
-      throw Exception("Acesso negado. Utilize uma conta @souunit.com.br");
+
+      throw FirebaseAuthException(
+        code: 'invalid-domain',
+        message: 'Utilize um email @souunit.com.br',
+      );
     }
   }
 
@@ -20,31 +24,32 @@ class AuthService {
         email: email,
         password: senha,
       );
-      
+
       _validarDominioInstitucional(userCredential.user);
-      
+
       return userCredential;
     } catch (e) {
       rethrow;
     }
   }
 
-  Future<UserCredential> cadastrarComEmailSenha(String email, String senha) async {
+  Future<UserCredential> cadastrarComEmailSenha(
+    String email,
+    String senha,
+  ) async {
     try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: senha,
-      );
-      
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: senha);
+
       _validarDominioInstitucional(userCredential.user);
-      
+
       return userCredential;
     } catch (e) {
       rethrow;
     }
   }
 
-//INICIO
+  //INICIO
   Future<void> logout() async {
     await _auth.signOut();
   } //FIM
