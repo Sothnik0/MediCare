@@ -3,6 +3,8 @@ import '../../../../../core/temas/cores_app.dart';
 import 'tela_login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/servicos/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TelaCadastro extends StatefulWidget {
   const TelaCadastro({super.key});
@@ -12,6 +14,7 @@ class TelaCadastro extends StatefulWidget {
 }
 
 class _TelaCadastroState extends State<TelaCadastro> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final _nomeController = TextEditingController();
   final _nascimentoController = TextEditingController();
   final _cpfController = TextEditingController();
@@ -235,7 +238,6 @@ class _TelaCadastroState extends State<TelaCadastro> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Utilize um email @souunit.com.br')),
             );
-
             return;
           }
 
@@ -246,10 +248,30 @@ class _TelaCadastroState extends State<TelaCadastro> {
             return;
           }
 
-          await _authService.cadastrarComEmailSenha(
-            _emailController.text.trim(),
-            _senhaController.text.trim(),
+          final UserCredential credencial = await _authService
+              .cadastrarComEmailSenha(
+                _emailController.text.trim(),
+                _senhaController.text.trim(),
+              );
+
+          final partes = _nascimentoController.text.split('/');
+
+          final nascimento = DateTime(
+            int.parse(partes[2]),
+            int.parse(partes[1]),
+            int.parse(partes[0]),
           );
+
+          await FirebaseFirestore.instance
+              .collection('usuariosCadastrados')
+              .doc(credencial.user!.uid)
+              .set({
+                'nomeCompleto': _nomeController.text.trim(),
+                'cpf': _cpfController.text.trim(),
+                'email': _emailController.text.trim(),
+                'nascimento': Timestamp.fromDate(nascimento),
+                'senha': _senhaController.text.trim(),
+              });
 
           if (!mounted) return;
 
