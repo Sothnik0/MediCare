@@ -4,31 +4,47 @@ import 'package:firebase_auth/firebase_auth.dart';
 class AgendaService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final String _colecao = 'consultas';
 
-
-  Stream<List<Map<String, dynamic>>> consultasStream() {
+  CollectionReference get _colecao {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('Usuário não logado');
+    }
     return _firestore
-        .collection(_colecao)
-        .orderBy('criado_em', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs.map((doc) {
-            final dados = doc.data();
-            return {
-              'id': doc.id,
-              'nomeMedico': dados['nomeMedico'] ?? '',
-              'especialidade': dados['especialidade'] ?? '',
-              'crmRqe': dados['crmRqe'] ?? '',
-              'data': dados['data'] ?? '',
-              'horario': dados['horario'] ?? '',
-              'notificacaoAtivada': dados['notificacaoAtivada'] ?? false,
-              'criado_por': dados['criado_por'] ?? '',
-            };
-          }).toList();
-        });
+        .collection('usuarios')
+        .doc(user.uid)
+        .collection('consultas');
   }
 
+  // INÍCIO
+  Stream<List<Map<String, dynamic>>> consultasStream() {
+    try {
+      return _colecao
+          .orderBy('criado_em', descending: true)
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs.map((doc) {
+          final dados = doc.data() as Map<String, dynamic>;
+          return {
+            'id': doc.id,
+            'nomeMedico': dados['nomeMedico'] ?? '',
+            'especialidade': dados['especialidade'] ?? '',
+            'crmRqe': dados['crmRqe'] ?? '',
+            'data': dados['data'] ?? '',
+            'horario': dados['horario'] ?? '',
+            'notificacaoAtivada': dados['notificacaoAtivada'] ?? false,
+            'criado_por': dados['criado_por'] ?? '',
+          };
+        }).toList();
+      });
+    } catch (e) {
+      print("Erro ao obter stream: $e");
+      return Stream.value([]);
+    }
+  }
+  // FIM
+
+  // INÍCIO
   Future<void> adicionar({
     required String nomeMedico,
     required String especialidade,
@@ -36,10 +52,13 @@ class AgendaService {
     required String data,
     required String horario,
   }) async {
-    try { //INICIO
-      final String emailLogado = _auth.currentUser?.email ?? 'usuario_desconhecido';
+    try {
+      final user = _auth.currentUser;
+      final String emailLogado = user?.email ?? 'usuario_desconhecido';
 
-      await _firestore.collection(_colecao).add({
+      print('☁️ [Firestore] Salvando nova consulta no caminho: usuarios/${user?.uid}/consultas');
+
+      await _colecao.add({
         'nomeMedico': nomeMedico,
         'especialidade': especialidade,
         'crmRqe': crmRqe,
@@ -48,30 +67,37 @@ class AgendaService {
         'notificacaoAtivada': false,
         'criado_por': emailLogado,
         'criado_em': FieldValue.serverTimestamp(),
-      }); //FIM
+      });
     } catch (e) {
       print("Erro ao adicionar consulta: $e");
       rethrow;
     }
   }
+  // FIM
 
+  // INÍCIO
   Future<void> alternarNotificacao(String id, bool statusAtual) async {
-    try { //INICIO
-      await _firestore.collection(_colecao).doc(id).update({
+    try {
+      print('☁️ [Firestore] Atualizando notificação da consulta ID: $id');
+      await _colecao.doc(id).update({
         'notificacaoAtivada': !statusAtual,
       });
     } catch (e) {
       print("Erro ao atualizar notificação: $e");
       rethrow;
-    }//FIM
+    }
   }
+  // FIM
 
+  // INÍCIO
   Future<void> excluir(String id) async {
-    try {//INICIO
-      await _firestore.collection(_colecao).doc(id).delete();
+    try {
+      print('☁️ [Firestore] Excluindo consulta ID: $id');
+      await _colecao.doc(id).delete();
     } catch (e) {
       print("Erro ao excluir consulta: $e");
       rethrow;
-    }//FIM
+    }
   }
+  // FIM
 }
