@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../../../core/temas/cores_app.dart';
-import '../../../../../core/widgets/custom_button.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import '../../../../core/temas/cores_app.dart';
+import '../../../../core/widgets/custom_button.dart';
 import '../painters/clouds_painter.dart';
 import '../painters/landscape_painter.dart';
 import 'tela_cadastro.dart';
-import '../../../home/apresentacao/paginas/tela_inicial.dart';
 import '../../../../core/servicos/auth_service.dart';
 
 class TelaLogin extends StatefulWidget {
@@ -19,12 +20,107 @@ class _TelaLoginState extends State<TelaLogin> {
   final _senhaController = TextEditingController();
 
   final AuthService _authService = AuthService();
+  bool _carregando = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _senhaController.dispose();
     super.dispose();
+  }
+
+  void _mostrarMensagem(String texto) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
+  }
+
+  /// Converte códigos de erro do Firebase em mensagens amigáveis.
+  String _mensagemErroFirebase(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-domain':
+        return 'Utilize um e-mail ${AuthService.dominioInstitucional}';
+      case 'wrong-password':
+        return 'Senha incorreta.';
+      case 'user-not-found':
+        return 'Usuário não encontrado.';
+      case 'invalid-credential':
+      case 'invalid-login-credentials':
+        return 'E-mail ou senha inválidos.';
+      case 'invalid-email':
+        return 'E-mail inválido.';
+      case 'user-disabled':
+        return 'Esta conta foi desativada.';
+      case 'too-many-requests':
+        return 'Muitas tentativas. Tente novamente mais tarde.';
+      case 'network-request-failed':
+        return 'Falha de conexão. Verifique sua internet.';
+      default:
+        return 'Não foi possível entrar. Tente novamente.';
+    }
+  }
+
+  Future<void> _loginComEmailSenha() async {
+    if (_carregando) return;
+
+    final email = _emailController.text.trim();
+    final senha = _senhaController.text.trim();
+
+    if (email.isEmpty || senha.isEmpty) {
+      _mostrarMensagem('Preencha e-mail e senha.');
+      return;
+    }
+
+    // Validação rápida de UX. A validação definitiva é feita no AuthService.
+    if (!email.toLowerCase().endsWith(AuthService.dominioInstitucional)) {
+      _mostrarMensagem('Utilize um e-mail ${AuthService.dominioInstitucional}');
+      return;
+    }
+
+    setState(() => _carregando = true);
+    try {
+      await _authService.loginComEmailSenha(email, senha);
+      // Não navega manualmente: o authStateChanges() no main.dart troca a tela.
+    } on FirebaseAuthException catch (e) {
+      _mostrarMensagem(_mensagemErroFirebase(e));
+    } catch (_) {
+      _mostrarMensagem('Não foi possível entrar. Tente novamente.');
+    } finally {
+      if (mounted) setState(() => _carregando = false);
+    }
+  }
+
+  Future<void> _loginComGoogle() async {
+    if (_carregando) return;
+
+    setState(() => _carregando = true);
+    try {
+      await _authService.loginComGoogle();
+      // Não navega manualmente: o authStateChanges() no main.dart troca a tela.
+    } on GoogleSignInException catch (e) {
+      // Cancelamento pelo usuário (mobile) não é tratado como erro grave.
+      if (e.code == GoogleSignInExceptionCode.canceled) return;
+      _mostrarMensagem('Falha no login com Google.');
+    } on FirebaseAuthException catch (e) {
+      // Cancelamento do popup (web) também não é erro grave.
+      if (e.code == 'popup-closed-by-user' ||
+          e.code == 'cancelled-popup-request' ||
+          e.code == 'web-context-canceled') {
+        return;
+      }
+      _mostrarMensagem(_mensagemErroFirebase(e));
+    } catch (_) {
+      _mostrarMensagem('Falha no login com Google.');
+    } finally {
+      if (mounted) setState(() => _carregando = false);
+    }
+  }
+
+  void _irParaCadastro() {
+    if (_carregando) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TelaCadastro()),
+    );
   }
 
   @override
@@ -146,65 +242,23 @@ class _TelaLoginState extends State<TelaLogin> {
                     children: [
                       CustomButton(
                         label: 'ENTRAR',
-                        onPressed: () async {
-                          try {
-                            final email = _emailController.text.trim();
-                            final senha = _senhaController.text.trim();
-
-                            if (email.isEmpty || senha.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Preencha email e senha'),
-                                ),
-                              );
-                              return;
-                            }
-
-                            if (!email.toLowerCase().endsWith(
-                              '@souunit.com.br',
-                            )) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Utilize um email @souunit.com.br',
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-
-                            await _authService.loginComEmailSenha(email, senha);
-
-                            if (!mounted) return;
-
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const TelaInicial(),
-                              ),
-                            );
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Email ou senha inválidos'),
-                              ),
-                            );
-                          }
-                        },
+                        onPressed: _loginComEmailSenha,
                       ),
                       const SizedBox(height: 8),
+                      CustomButton(
+                        label: 'ENTRAR COM GOOGLE',
+                        onPressed: _loginComGoogle,
+                      ),
                       const SizedBox(height: 8),
                       CustomButton(
                         label: 'CADASTRAR',
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const TelaCadastro(),
-                            ),
-                          );
-                        },
+                        onPressed: _irParaCadastro,
                       ),
+                      if (_carregando)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 12),
+                          child: CircularProgressIndicator(),
+                        ),
                     ],
                   ),
                 ),
