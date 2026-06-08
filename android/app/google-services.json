@@ -29,6 +29,13 @@
             {
               "client_id": "903225590492-o817gepmf0bm7b7fvoplm6ps9ictpt5o.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "903225590492-urk937qtic8kf1bamugbhih333qp9fa2.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.medicare"
+              }
             }
           ]
         }
