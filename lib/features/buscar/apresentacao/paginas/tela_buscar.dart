@@ -1,9 +1,15 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import '../../../../core/temas/cores_app.dart';
 import '../../../agenda/apresentacao/componentes/recortes_nuvem.dart';
 import '../../dominio/entidades/remedio.dart';
 import '../componentes/botao_voltar_hover.dart';
 import '../componentes/remedio_card_hover.dart';
+import '../../../../core/servicos/remedios_service.dart';
 
 class TelaBuscar extends StatefulWidget {
   const TelaBuscar({super.key});
@@ -13,6 +19,16 @@ class TelaBuscar extends StatefulWidget {
 }
 
 class _TelaBuscarState extends State<TelaBuscar> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  User? _usuarioLogado;
+  String? _emailUsuarioLogado;
+  bool _validandoAcesso = true;
+
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _favoritosSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _notificacoesSub;
+
   CategoriaRemedio? _filtroSelecionado;
   bool _abaFavoritos = false;
 
@@ -28,32 +44,31 @@ class _TelaBuscarState extends State<TelaBuscar> {
   final _obsCtrl = TextEditingController();
   CategoriaRemedio _categoriaForm = CategoriaRemedio.nenhuma;
 
-  final List<Remedio> _remedios = [
-    Remedio(
-      nome: "CARDALI",
-      horario: "14:00",
-      categoria: CategoriaRemedio.cardiaco,
-      imagem:
-          "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=1200&auto=format&fit=crop",
-    ),
-    Remedio(
-      nome: "MEBENDAZOL",
-      horario: "18:00",
-      categoria: CategoriaRemedio.dor,
-      imagem:
-          "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?q=80&w=1200&auto=format&fit=crop",
-    ),
-    Remedio(
-      nome: "SÍBUS",
-      horario: "22:00",
-      categoria: CategoriaRemedio.vitaminina,
-      imagem:
-          "https://images.unsplash.com/photo-1471864190281-a93a3070b6de?q=80&w=1200&auto=format&fit=crop",
-    ),
-  ];
+  CollectionReference<Map<String, dynamic>> get _usuariosCollection =>
+      _firestore.collection('usuarios');
+
+  DocumentReference<Map<String, dynamic>> get _usuarioRef =>
+      _usuariosCollection.doc(_usuarioLogado!.uid);
+
+  CollectionReference<Map<String, dynamic>> get _remediosRef =>
+      _usuarioRef.collection('remedios');
+
+  CollectionReference<Map<String, dynamic>> get _favoritosRef =>
+      _usuarioRef.collection('favoritos');
+
+  CollectionReference<Map<String, dynamic>> get _notificacoesRef =>
+      _usuarioRef.collection('notificacoes');
+
+  @override
+  void initState() {
+    super.initState();
+    _validarUsuarioInstitucional();
+  }
 
   @override
   void dispose() {
+    _favoritosSub?.cancel();
+    _notificacoesSub?.cancel();
     _nomeCtrl.dispose();
     _horarioCtrl.dispose();
     _obsCtrl.dispose();
@@ -61,55 +76,324 @@ class _TelaBuscarState extends State<TelaBuscar> {
     super.dispose();
   }
 
-  List<Remedio> get _remediosFiltrados {
-    List<Remedio> base = _abaFavoritos
-        ? _remedios.where((r) => _favoritos.contains(r.nome)).toList()
-        : _remedios;
+  Future<void> _validarUsuarioInstitucional() async {
+    final user = _auth.currentUser;
+    final email = user?.email?.trim().toLowerCase();
 
-    if (_filtroSelecionado != null) {
-      base = base.where((r) => r.categoria == _filtroSelecionado).toList();
+    if (user == null || email == null || !email.endsWith('@souunit.com.br')) {
+      await _bloquearAcesso();
+      return;
     }
 
-    if (_termoBusca.trim().isNotEmpty) {
-      base = base
-          .where(
-            (r) =>
-                r.nome.toLowerCase().contains(_termoBusca.trim().toLowerCase()),
-          )
-          .toList();
-    }
+    _usuarioLogado = user;
+    _emailUsuarioLogado = email;
 
-    return base;
+    await _usuarioRef.set({
+      'uid': user.uid,
+      'email': email,
+      'dominio_validado': true,
+      'ultimoAcesso': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    _ouvirDadosUsuario();
+
+    if (mounted) {
+      setState(() {
+        _validandoAcesso = false;
+      });
+    }
   }
 
-  void _toggleFavorito(String nome) => setState(
-    () => _favoritos.contains(nome)
-        ? _favoritos.remove(nome)
-        : _favoritos.add(nome),
-  );
+  Future<void> _bloquearAcesso() async {
+    await _auth.signOut();
 
-  void _toggleNotificacao(String nome) => setState(
-    () => _notificacoes.contains(nome)
-        ? _notificacoes.remove(nome)
-        : _notificacoes.add(nome),
-  );
+    if (!mounted) return;
 
-  void _excluirRemedio(String nome) {
     setState(() {
-      _remedios.removeWhere((r) => r.nome == nome);
-      _favoritos.remove(nome);
-      _notificacoes.remove(nome);
+      _validandoAcesso = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Acesso negado. Use uma conta institucional @souunit.com.br.',
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+  }
+
+  void _ouvirDadosUsuario() {
+    _favoritosSub?.cancel();
+    _notificacoesSub?.cancel();
+
+    _favoritosSub = _favoritosRef.snapshots().listen((snapshot) {
+      if (!mounted) return;
+
+      setState(() {
+        _favoritos
+          ..clear()
+          ..addAll(snapshot.docs.map((doc) => doc.id));
+      });
+    });
+
+    _notificacoesSub = _notificacoesRef.snapshots().listen((snapshot) {
+      if (!mounted) return;
+
+      setState(() {
+        _notificacoes
+          ..clear()
+          ..addAll(snapshot.docs.map((doc) => doc.id));
+      });
     });
   }
 
-  void _confirmarExclusao(String nome) {
+  String _categoriaToString(CategoriaRemedio categoria) {
+    if (categoria == CategoriaRemedio.cardiaco) return 'cardiaco';
+    if (categoria == CategoriaRemedio.dor) return 'dor';
+    if (categoria == CategoriaRemedio.vitaminina) return 'vitaminina';
+    return 'nenhuma';
+  }
+
+  CategoriaRemedio _stringToCategoria(dynamic valor) {
+    if (valor == 'cardiaco') return CategoriaRemedio.cardiaco;
+    if (valor == 'dor') return CategoriaRemedio.dor;
+    if (valor == 'vitaminina') return CategoriaRemedio.vitaminina;
+    return CategoriaRemedio.nenhuma;
+  }
+
+  Remedio _remedioFromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final dados = doc.data();
+
+    return Remedio(
+      nome: dados['nome'] ?? '',
+      horario: dados['horario'] ?? '',
+      obs: dados['obs'] ?? 'NENHUMA',
+      categoria: _stringToCategoria(dados['categoria']),
+      imagem: dados['imagem'] ?? '',
+    );
+  }
+
+  Future<void> _toggleFavorito(String docId, Remedio remedio) async {
+    if (_emailUsuarioLogado == null) return;
+
+    try {
+      final docRef = _favoritosRef.doc(docId);
+
+      if (_favoritos.contains(docId)) {
+        await docRef.delete();
+      } else {
+        await docRef.set({
+          'ativo': true,
+          'remedio_id': docId,
+          'remedio_nome': remedio.nome,
+          'usuario_logado': _emailUsuarioLogado,
+          'criado_por': _emailUsuarioLogado,
+          'criado_em': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao favoritar: $e');
+    }
+  }
+
+  Future<void> _toggleNotificacao(String docId, Remedio remedio) async {
+    if (_emailUsuarioLogado == null) return;
+
+    try {
+      final docRef = _notificacoesRef.doc(docId);
+
+      if (_notificacoes.contains(docId)) {
+        await docRef.delete();
+      } else {
+        await docRef.set({
+          'ativo': true,
+          'remedio_id': docId,
+          'remedio_nome': remedio.nome,
+          'horario': remedio.horario,
+          'usuario_logado': _emailUsuarioLogado,
+          'criado_por': _emailUsuarioLogado,
+          'criado_em': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro na notificação: $e');
+    }
+  }
+
+  Future<void> _excluirRemedio(String docId) async {
+    try {
+      await _remediosRef.doc(docId).delete();
+      await _favoritosRef.doc(docId).delete();
+      await _notificacoesRef.doc(docId).delete();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Remédio excluído com sucesso!'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Erro ao excluir: $e');
+    }
+  }
+
+  Future<void> _salvarRemedio() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_emailUsuarioLogado == null) return;
+
+    final nomeFormatado = _nomeCtrl.text.trim().toUpperCase();
+
+    try {
+      await _usuarioRef.set({
+        'email': _emailUsuarioLogado,
+        'ultimoAcesso': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await _remediosRef.add({
+        'nome': nomeFormatado,
+        'horario': _horarioCtrl.text.trim(),
+        'obs': _obsCtrl.text.trim().isEmpty
+            ? 'NENHUMA'
+            : _obsCtrl.text.trim().toUpperCase(),
+        'categoria': _categoriaToString(_categoriaForm),
+        'imagem':
+            'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=1200&auto=format&fit=crop',
+        'usuario_logado': _emailUsuarioLogado,
+        'criado_por': _emailUsuarioLogado,
+        'criado_em': FieldValue.serverTimestamp(),
+        'atualizado_em': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        Navigator.pop(context);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Medicamento cadastrado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (erro) {
+      debugPrint('Erro ao salvar no Firestore: $erro');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao salvar: $erro'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _atualizarRemedio(String docId) async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_emailUsuarioLogado == null) return;
+
+    final nomeFormatado = _nomeCtrl.text.trim().toUpperCase();
+
+    try {
+      await _remediosRef.doc(docId).update({
+        'nome': nomeFormatado,
+        'horario': _horarioCtrl.text.trim(),
+        'obs': _obsCtrl.text.trim().isEmpty
+            ? 'NENHUMA'
+            : _obsCtrl.text.trim().toUpperCase(),
+        'categoria': _categoriaToString(_categoriaForm),
+        'usuario_logado': _emailUsuarioLogado,
+        'atualizado_por': _emailUsuarioLogado,
+        'atualizado_em': FieldValue.serverTimestamp(),
+      });
+
+      if (_favoritos.contains(docId)) {
+        await _favoritosRef.doc(docId).set({
+          'remedio_nome': nomeFormatado,
+          'usuario_logado': _emailUsuarioLogado,
+          'atualizado_em': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      if (_notificacoes.contains(docId)) {
+        await _notificacoesRef.doc(docId).set({
+          'remedio_nome': nomeFormatado,
+          'horario': _horarioCtrl.text.trim(),
+          'usuario_logado': _emailUsuarioLogado,
+          'atualizado_em': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Medicamento atualizado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (erro) {
+      debugPrint('Erro ao atualizar no Firestore: $erro');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao atualizar: $erro'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _filtrarDocsDoBanco(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> listaFiltrada = [...docs];
+
+    if (_abaFavoritos) {
+      listaFiltrada = listaFiltrada
+          .where((doc) => _favoritos.contains(doc.id))
+          .toList();
+    }
+
+    if (_filtroSelecionado != null) {
+      listaFiltrada = listaFiltrada.where((doc) {
+        final dados = doc.data();
+        return _stringToCategoria(dados['categoria']) == _filtroSelecionado;
+      }).toList();
+    }
+
+    if (_termoBusca.trim().isNotEmpty) {
+      final termo = _termoBusca.trim().toLowerCase();
+
+      listaFiltrada = listaFiltrada.where((doc) {
+        final dados = doc.data();
+        final nome = (dados['nome'] ?? '').toString().toLowerCase();
+        return nome.contains(termo);
+      }).toList();
+    }
+
+    return listaFiltrada;
+  }
+
+  void _confirmarExclusao(String nome, String docId) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: CoresApp.nuvemBranco,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          "EXCLUIR REMÉDIO",
+          'EXCLUIR REMÉDIO',
           style: TextStyle(
             fontFamily: 'Serif',
             fontSize: 17,
@@ -117,14 +401,14 @@ class _TelaBuscarState extends State<TelaBuscar> {
           ),
         ),
         content: Text(
-          "Deseja excluir o remédio $nome?",
+          'Deseja excluir o remédio $nome?',
           style: const TextStyle(fontFamily: 'Serif', fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text(
-              "CANCELAR",
+              'CANCELAR',
               style: TextStyle(color: Colors.grey, fontFamily: 'Serif'),
             ),
           ),
@@ -137,10 +421,10 @@ class _TelaBuscarState extends State<TelaBuscar> {
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              _excluirRemedio(nome);
+              _excluirRemedio(docId);
             },
             child: const Text(
-              "EXCLUIR",
+              'EXCLUIR',
               style: TextStyle(color: Colors.white, fontFamily: 'Serif'),
             ),
           ),
@@ -149,10 +433,14 @@ class _TelaBuscarState extends State<TelaBuscar> {
     );
   }
 
-  void _abrirPopUpNotificacoes() {
-    final comNotificacao = _remedios
-        .where((r) => _notificacoes.contains(r.nome))
+  Future<void> _abrirPopUpNotificacoes() async {
+    final snapshot = await _remediosRef.get();
+
+    final docsComNotificacao = snapshot.docs
+        .where((doc) => _notificacoes.contains(doc.id))
         .toList();
+
+    if (!mounted) return;
 
     showDialog(
       context: context,
@@ -175,7 +463,7 @@ class _TelaBuscarState extends State<TelaBuscar> {
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
-                      "NOTIFICAÇÕES ATIVAS",
+                      'NOTIFICAÇÕES ATIVAS',
                       style: TextStyle(
                         fontFamily: 'Serif',
                         fontSize: 16,
@@ -195,12 +483,12 @@ class _TelaBuscarState extends State<TelaBuscar> {
                 ],
               ),
               const SizedBox(height: 16),
-              if (comNotificacao.isEmpty)
+              if (docsComNotificacao.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Center(
                     child: Text(
-                      "Nenhuma notificação ativa.\nToque no 🔔 de um remédio para ativar.",
+                      'Nenhuma notificação ativa.\nToque no 🔔 de um remédio para ativar.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'Serif',
@@ -215,10 +503,12 @@ class _TelaBuscarState extends State<TelaBuscar> {
                   constraints: const BoxConstraints(maxHeight: 360),
                   child: ListView.separated(
                     shrinkWrap: true,
-                    itemCount: comNotificacao.length,
+                    itemCount: docsComNotificacao.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (context, i) {
-                      final r = comNotificacao[i];
+                      final doc = docsComNotificacao[i];
+                      final r = _remedioFromDoc(doc);
+
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Row(
@@ -248,7 +538,7 @@ class _TelaBuscarState extends State<TelaBuscar> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    "HORÁRIO: ${r.horario}",
+                                    'HORÁRIO: ${r.horario}',
                                     style: TextStyle(
                                       fontFamily: 'Serif',
                                       fontSize: 13,
@@ -260,25 +550,16 @@ class _TelaBuscarState extends State<TelaBuscar> {
                                 ],
                               ),
                             ),
-                            StatefulBuilder(
-                              builder: (context, setLocalState) => MouseRegion(
-                                cursor: SystemMouseCursors.click,
-                                child: GestureDetector(
-                                  onTap: () {
-                                    _toggleNotificacao(r.nome);
-                                    if (_notificacoes.isEmpty) {
-                                      Navigator.pop(context);
-                                    } else {
-                                      setLocalState(() {});
-                                    }
-                                  },
-                                  child: const Icon(
-                                    Icons.notifications_active,
-                                    color: Color(0xFF008D95),
-                                    size: 26,
-                                  ),
-                                ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.notifications_active,
+                                color: Color(0xFF008D95),
+                                size: 26,
                               ),
+                              onPressed: () {
+                                _toggleNotificacao(doc.id, r);
+                                Navigator.pop(context);
+                              },
                             ),
                           ],
                         ),
@@ -299,6 +580,28 @@ class _TelaBuscarState extends State<TelaBuscar> {
     _obsCtrl.clear();
     _categoriaForm = CategoriaRemedio.nenhuma;
 
+    _abrirFormularioRemedio(
+      titulo: 'ADICIONAR REMÉDIO',
+      onSalvar: _salvarRemedio,
+    );
+  }
+
+  void _abrirDialogEditar(Remedio remedio, String docId) {
+    _nomeCtrl.text = remedio.nome;
+    _horarioCtrl.text = remedio.horario;
+    _obsCtrl.text = remedio.obs == 'NENHUMA' ? '' : remedio.obs;
+    _categoriaForm = remedio.categoria;
+
+    _abrirFormularioRemedio(
+      titulo: 'EDITAR REMÉDIO',
+      onSalvar: () => _atualizarRemedio(docId),
+    );
+  }
+
+  void _abrirFormularioRemedio({
+    required String titulo,
+    required VoidCallback onSalvar,
+  }) {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -307,9 +610,9 @@ class _TelaBuscarState extends State<TelaBuscar> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
-            "ADICIONAR REMÉDIO",
-            style: TextStyle(
+          title: Text(
+            titulo,
+            style: const TextStyle(
               fontFamily: 'Serif',
               fontSize: 18,
               color: CoresApp.textoForte,
@@ -325,36 +628,42 @@ class _TelaBuscarState extends State<TelaBuscar> {
                   controller: _nomeCtrl,
                   textCapitalization: TextCapitalization.characters,
                   decoration: const InputDecoration(
-                    labelText: "Nome do remédio",
+                    labelText: 'Nome do remédio',
                     labelStyle: TextStyle(fontFamily: 'Serif'),
                   ),
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? "Campo obrigatório"
-                      : null,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Campo obrigatório';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _horarioCtrl,
                   keyboardType: TextInputType.datetime,
                   decoration: const InputDecoration(
-                    labelText: "Horário (ex: 08:00)",
+                    labelText: 'Horário (ex: 08:00)',
                     labelStyle: TextStyle(fontFamily: 'Serif'),
                   ),
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? "Campo obrigatório"
-                      : null,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Campo obrigatório';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _obsCtrl,
                   decoration: const InputDecoration(
-                    labelText: "Observação (opcional)",
+                    labelText: 'Observação (opcional)',
                     labelStyle: TextStyle(fontFamily: 'Serif'),
                   ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  "CATEGORIA",
+                  'CATEGORIA',
                   style: TextStyle(
                     fontFamily: 'Serif',
                     fontSize: 13,
@@ -371,12 +680,15 @@ class _TelaBuscarState extends State<TelaBuscar> {
                         CategoriaRemedio.cardiaco,
                       ].map((cat) {
                         final ativo = _categoriaForm == cat;
+
                         return GestureDetector(
-                          onTap: () => setDialogState(
-                            () => _categoriaForm = ativo
-                                ? CategoriaRemedio.nenhuma
-                                : cat,
-                          ),
+                          onTap: () {
+                            setDialogState(() {
+                              _categoriaForm = ativo
+                                  ? CategoriaRemedio.nenhuma
+                                  : cat;
+                            });
+                          },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 150),
                             padding: const EdgeInsets.symmetric(
@@ -415,7 +727,7 @@ class _TelaBuscarState extends State<TelaBuscar> {
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text(
-                "CANCELAR",
+                'CANCELAR',
                 style: TextStyle(color: Colors.grey, fontFamily: 'Serif'),
               ),
             ),
@@ -426,9 +738,9 @@ class _TelaBuscarState extends State<TelaBuscar> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onPressed: _salvarRemedio,
+              onPressed: onSalvar,
               child: const Text(
-                "SALVAR",
+                'SALVAR',
                 style: TextStyle(color: Colors.white, fontFamily: 'Serif'),
               ),
             ),
@@ -438,26 +750,24 @@ class _TelaBuscarState extends State<TelaBuscar> {
     );
   }
 
-  void _salvarRemedio() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _remedios.add(
-          Remedio(
-            nome: _nomeCtrl.text.trim().toUpperCase(),
-            horario: _horarioCtrl.text.trim(),
-            obs: _obsCtrl.text.trim().isEmpty
-                ? 'NENHUMA'
-                : _obsCtrl.text.trim().toUpperCase(),
-            categoria: _categoriaForm,
-          ),
-        );
-      });
-      Navigator.pop(context);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    if (_validandoAcesso) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF008D95)),
+        ),
+      );
+    }
+
+    if (_usuarioLogado == null || _emailUsuarioLogado == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Acesso bloqueado. Faça login com e-mail institucional.'),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton(
@@ -484,7 +794,66 @@ class _TelaBuscarState extends State<TelaBuscar> {
                         const SizedBox(height: 24),
                         if (!_abaFavoritos) _buildFiltros(),
                         if (!_abaFavoritos) const SizedBox(height: 24),
-                        _buildListaMedicamentos(),
+                        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                          stream: _remediosRef
+                              .orderBy('criado_em', descending: true)
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              return const Center(
+                                child: Text('Erro ao carregar dados.'),
+                              );
+                            }
+
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Center(
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF008D95),
+                                ),
+                              );
+                            }
+
+                            final docsFiltrados = _filtrarDocsDoBanco(
+                              snapshot.data!.docs,
+                            );
+
+                            if (docsFiltrados.isEmpty) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 48,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _abaFavoritos
+                                        ? 'Nenhum favorito ainda.\nToque no ♡ para favoritar.'
+                                        : 'Nenhum remédio cadastrado.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontFamily: 'Serif',
+                                      fontSize: 16,
+                                      color: CoresApp.textoForte.withOpacity(
+                                        0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                              ),
+                              child: Column(
+                                children: docsFiltrados.map((doc) {
+                                  final remedio = _remedioFromDoc(doc);
+                                  return _buildRemedioCard(remedio, doc.id);
+                                }).toList(),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -526,63 +895,58 @@ class _TelaBuscarState extends State<TelaBuscar> {
                 fit: BoxFit.cover,
               ),
             ),
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: _abrirPopUpNotificacoes,
-                child: Stack(
-                  children: [
-                    Icon(
-                      _notificacoes.isNotEmpty
-                          ? Icons.notifications
-                          : Icons.notifications_none,
-                      size: 38,
-                      color: CoresApp.textoForte,
-                    ),
-                    if (_notificacoes.isNotEmpty)
-                      Positioned(
-                        right: 2,
-                        top: 2,
-                        child: Container(
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF008D95),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${_notificacoes.length}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
+            Row(
+              children: [
+                Text(
+                  _emailUsuarioLogado ?? '',
+                  style: TextStyle(
+                    fontFamily: 'Serif',
+                    fontSize: 12,
+                    color: CoresApp.textoForte.withOpacity(0.65),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: _abrirPopUpNotificacoes,
+                    child: Stack(
+                      children: [
+                        Icon(
+                          _notificacoes.isNotEmpty
+                              ? Icons.notifications
+                              : Icons.notifications_none,
+                          size: 38,
+                          color: CoresApp.textoForte,
+                        ),
+                        if (_notificacoes.isNotEmpty)
+                          Positioned(
+                            right: 2,
+                            top: 2,
+                            child: Container(
+                              width: 18,
+                              height: 18,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF008D95),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${_notificacoes.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      )
-                    else
-                      Positioned(
-                        right: 2,
-                        top: 2,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: const BoxDecoration(
-                            color: CoresApp.textoForte,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            color: Colors.white,
-                            size: 10,
-                          ),
-                        ),
-                      ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
@@ -601,22 +965,26 @@ class _TelaBuscarState extends State<TelaBuscar> {
         Row(
           children: [
             _buildAbaWidget(
-              texto: "BUSCAR",
+              texto: 'BUSCAR',
               ativo: !_abaFavoritos,
-              onTap: () => setState(() {
-                _abaFavoritos = false;
-                _termoBusca = "";
-                _searchCtrl.clear();
-              }),
+              onTap: () {
+                setState(() {
+                  _abaFavoritos = false;
+                  _termoBusca = '';
+                  _searchCtrl.clear();
+                });
+              },
             ),
             _buildAbaWidget(
-              texto: "FAVORITOS",
+              texto: 'FAVORITOS',
               ativo: _abaFavoritos,
-              onTap: () => setState(() {
-                _abaFavoritos = true;
-                _termoBusca = "";
-                _searchCtrl.clear();
-              }),
+              onTap: () {
+                setState(() {
+                  _abaFavoritos = true;
+                  _termoBusca = '';
+                  _searchCtrl.clear();
+                });
+              },
             ),
           ],
         ),
@@ -681,10 +1049,18 @@ class _TelaBuscarState extends State<TelaBuscar> {
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: TextField(
                   controller: _searchCtrl,
-                  onChanged: (v) => setState(() => _termoBusca = v),
-                  onSubmitted: (v) => setState(() => _termoBusca = v),
+                  onChanged: (v) {
+                    setState(() {
+                      _termoBusca = v;
+                    });
+                  },
+                  onSubmitted: (v) {
+                    setState(() {
+                      _termoBusca = v;
+                    });
+                  },
                   decoration: const InputDecoration(
-                    hintText: "Buscar medicamento...",
+                    hintText: 'Buscar medicamento...',
                     border: InputBorder.none,
                     hintStyle: TextStyle(
                       fontFamily: 'Serif',
@@ -695,15 +1071,16 @@ class _TelaBuscarState extends State<TelaBuscar> {
                 ),
               ),
             ),
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => setState(() => _termoBusca = _searchCtrl.text),
-                child: const Icon(
-                  Icons.search,
-                  size: 32,
-                  color: CoresApp.textoForte,
-                ),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _termoBusca = _searchCtrl.text;
+                });
+              },
+              child: const Icon(
+                Icons.search,
+                size: 32,
+                color: CoresApp.textoForte,
               ),
             ),
             const SizedBox(width: 16),
@@ -719,9 +1096,9 @@ class _TelaBuscarState extends State<TelaBuscar> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _buildFiltroWidget("DOR", CategoriaRemedio.dor),
-          _buildFiltroWidget("VITAMINA", CategoriaRemedio.vitaminina),
-          _buildFiltroWidget("CARDÍACO", CategoriaRemedio.cardiaco),
+          _buildFiltroWidget('DOR', CategoriaRemedio.dor),
+          _buildFiltroWidget('VITAMINA', CategoriaRemedio.vitaminina),
+          _buildFiltroWidget('CARDÍACO', CategoriaRemedio.cardiaco),
         ],
       ),
     );
@@ -730,68 +1107,41 @@ class _TelaBuscarState extends State<TelaBuscar> {
   Widget _buildFiltroWidget(String texto, CategoriaRemedio cat) {
     final bool ativo = _filtroSelecionado == cat;
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () => setState(() => _filtroSelecionado = ativo ? null : cat),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: ativo
-                ? Border.all(color: const Color(0xFF008D95), width: 1.5)
-                : null,
-            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
-          ),
-          child: Text(
-            texto,
-            style: TextStyle(
-              color: ativo ? const Color(0xFF008D95) : CoresApp.textoSecundario,
-              fontSize: 14,
-              fontFamily: 'Serif',
-            ),
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _filtroSelecionado = ativo ? null : cat;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: ativo
+              ? Border.all(color: const Color(0xFF008D95), width: 1.5)
+              : null,
+          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+        ),
+        child: Text(
+          texto,
+          style: TextStyle(
+            color: ativo ? const Color(0xFF008D95) : CoresApp.textoSecundario,
+            fontSize: 14,
+            fontFamily: 'Serif',
           ),
         ),
       ),
     );
   }
 
-  Widget _buildListaMedicamentos() {
-    final lista = _remediosFiltrados;
-
-    if (lista.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48),
-        child: Center(
-          child: Text(
-            _abaFavoritos
-                ? "Nenhum favorito ainda.\nToque no ♡ para favoritar."
-                : "Nenhum remédio encontrado.",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Serif',
-              fontSize: 16,
-              color: CoresApp.textoForte.withOpacity(0.5),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      child: Column(children: lista.map((r) => _buildRemedioCard(r)).toList()),
-    );
-  }
-
-  Widget _buildRemedioCard(Remedio r) {
-    final bool favoritado = _favoritos.contains(r.nome);
-    final bool notificacaoAtiva = _notificacoes.contains(r.nome);
+  Widget _buildRemedioCard(Remedio r, String docId) {
+    final bool favoritado = _favoritos.contains(docId);
+    final bool notificacaoAtiva = _notificacoes.contains(docId);
 
     return RemedioCardHover(
-      key: ValueKey(r.nome),
+      key: ValueKey(docId),
       onTap: () {},
       cardBuilder: (hovered) => AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -847,59 +1197,45 @@ class _TelaBuscarState extends State<TelaBuscar> {
                             ),
                           ),
                         ),
-                        MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: GestureDetector(
-                            onTap: () => _toggleFavorito(r.nome),
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              transitionBuilder: (child, anim) =>
-                                  ScaleTransition(scale: anim, child: child),
-                              child: Icon(
-                                favoritado
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                key: ValueKey('fav_$favoritado'),
-                                size: 26,
-                                color: favoritado
-                                    ? Colors.red
-                                    : CoresApp.textoForte,
-                              ),
-                            ),
+                        GestureDetector(
+                          onTap: () => _toggleFavorito(docId, r),
+                          child: Icon(
+                            favoritado ? Icons.favorite : Icons.favorite_border,
+                            size: 26,
+                            color: favoritado
+                                ? Colors.red
+                                : CoresApp.textoForte,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: GestureDetector(
-                            onTap: () => _toggleNotificacao(r.nome),
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              transitionBuilder: (child, anim) =>
-                                  ScaleTransition(scale: anim, child: child),
-                              child: Icon(
-                                notificacaoAtiva
-                                    ? Icons.notifications_active
-                                    : Icons.notifications_none,
-                                key: ValueKey('notif_$notificacaoAtiva'),
-                                size: 28,
-                                color: notificacaoAtiva
-                                    ? const Color(0xFF008D95)
-                                    : CoresApp.textoForte,
-                              ),
-                            ),
+                        GestureDetector(
+                          onTap: () => _toggleNotificacao(docId, r),
+                          child: Icon(
+                            notificacaoAtiva
+                                ? Icons.notifications_active
+                                : Icons.notifications_none,
+                            size: 28,
+                            color: notificacaoAtiva
+                                ? const Color(0xFF008D95)
+                                : CoresApp.textoForte,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: GestureDetector(
-                            onTap: () => _confirmarExclusao(r.nome),
-                            child: const Icon(
-                              Icons.delete_outline,
-                              size: 26,
-                              color: Colors.red,
-                            ),
+                        GestureDetector(
+                          onTap: () => _abrirDialogEditar(r, docId),
+                          child: const Icon(
+                            Icons.edit_outlined,
+                            size: 25,
+                            color: Color(0xFF008D95),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () => _confirmarExclusao(r.nome, docId),
+                          child: const Icon(
+                            Icons.delete_outline,
+                            size: 26,
+                            color: Colors.red,
                           ),
                         ),
                       ],
@@ -907,12 +1243,15 @@ class _TelaBuscarState extends State<TelaBuscar> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Text(
-                          "OBS: ${r.obs}",
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: CoresApp.textoForte.withOpacity(0.6),
-                            fontFamily: 'Serif',
+                        Flexible(
+                          child: Text(
+                            'OBS: ${r.obs}',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: CoresApp.textoForte.withOpacity(0.6),
+                              fontFamily: 'Serif',
+                            ),
                           ),
                         ),
                         if (r.categoria != CategoriaRemedio.nenhuma) ...[
@@ -942,7 +1281,7 @@ class _TelaBuscarState extends State<TelaBuscar> {
                     Align(
                       alignment: Alignment.bottomRight,
                       child: Text(
-                        "HORÁRIO: ${r.horario}",
+                        'HORÁRIO: ${r.horario}',
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,

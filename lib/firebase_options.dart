@@ -46,6 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '903225590492',
     projectId: 'medicare-unit',
     authDomain: 'medicare-unit.firebaseapp.com',
+    databaseURL: 'https://medicare-unit-default-rtdb.firebaseio.com',
     storageBucket: 'medicare-unit.firebasestorage.app',
   );
 
@@ -54,24 +55,25 @@ class DefaultFirebaseOptions {
     appId: '1:903225590492:android:89a9882f33b8fdcbb56a19',
     messagingSenderId: '903225590492',
     projectId: 'medicare-unit',
+    databaseURL: 'https://medicare-unit-default-rtdb.firebaseio.com',
     storageBucket: 'medicare-unit.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBlL-wsmY4JKds9x01eRbMkeiZswbz5BtQ',
     appId: '1:903225590492:ios:d990eb93ac4ad03cb56a19',
     messagingSenderId: '903225590492',
     projectId: 'medicare-unit',
+    databaseURL: 'https://medicare-unit-default-rtdb.firebaseio.com',
     storageBucket: 'medicare-unit.firebasestorage.app',
     iosClientId: '903225590492-urk937qtic8kf1bamugbhih333qp9fa2.apps.googleusercontent.com',
     iosBundleId: 'com.example.medicare',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyBlL-wsmY4JKds9x01eRbMkeiZswbz5BtQ',
     appId: '1:903225590492:ios:d990eb93ac4ad03cb56a19',
     messagingSenderId: '903225590492',
     projectId: 'medicare-unit',
+    databaseURL: 'https://medicare-unit-default-rtdb.firebaseio.com',
     storageBucket: 'medicare-unit.firebasestorage.app',
     iosClientId: '903225590492-urk937qtic8kf1bamugbhih333qp9fa2.apps.googleusercontent.com',
     iosBundleId: 'com.example.medicare',
@@ -83,6 +85,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '903225590492',
     projectId: 'medicare-unit',
     authDomain: 'medicare-unit.firebaseapp.com',
+    databaseURL: 'https://medicare-unit-default-rtdb.firebaseio.com',
     storageBucket: 'medicare-unit.firebasestorage.app',
   );
 }
