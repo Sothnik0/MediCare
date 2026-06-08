@@ -101,5 +101,7 @@ class AuthService {
       }
     }
     await _auth.signOut();
-  }
+  } //FIM
+
+  String? get usuarioLogadoEmail => _auth.currentUser?.email;
 }
