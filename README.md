@@ -8,7 +8,7 @@ Aplicativo móvel de monitoramento médico desenvolvido em Flutter com integraç
 | **Lucas Gravatá Portilho** | Telas e funcionalidades de Gerenciamento de Medicamentos | https://drive.google.com/drive/folders/17PfMiyscaO7FwV1BUzGxttgcZFGqpfPj?usp=sharing |
 | **Carlos Eduardo Lima Santos** | Integração Firebase em Main, auth_service, agenda_service, tela_inicial, tela_agenda_medical | https://drive.google.com/drive/folders/1WkyQKbf47DO33yUftHuT2eEJXfybXuCD?usp=sharing |
 | **Enzo Gabriel de Araújo Soares** | Tela de cadastro e confirmação de cadastro e integração com o banco de dados | https://youtu.be/9lawYzdJNfU | 
-| **Lucca Derlan Barreto Costa** | Tela de Login, integração com Firebase, autenticação com Google no Login e login com email institucional |  
+| **Lucca Derlan Barreto Costa** | Tela de Login, integração com Firebase, autenticação com Google no Login e login com email institucional |  https://drive.google.com/file/d/1x61rWvl3DELbhRJw8JXQVbnwA2pZoZ7o/view?usp=drive_link
 | **Davi Gabriel dos Santos Mota** | Tela buscar, integração Firebase em tela_buscar e modificar funções | https://drive.google.com/file/d/1QoosfPJyAAQGPdkWOO-V4T0Rrko89V98/view?usp=sharing
 
 ---
